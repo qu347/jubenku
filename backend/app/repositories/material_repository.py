@@ -84,13 +84,14 @@ class MaterialRepository:
             statement = statement.where(Material.file_extension == normalized_extension)
         if tags:
             tags_expression = cast(Material.tags_json, Text)
-            clauses = []
+            required_tag_clauses = []
             for tag in tags:
+                representations = []
                 encoded = json.dumps(tag, ensure_ascii=True)
-                clauses.append(tags_expression.ilike(f"%{encoded}%"))
+                representations.append(tags_expression.ilike(f"%{encoded}%"))
                 if not tag.isascii():
-                    clauses.append(tags_expression.ilike(f'%"{tag}"%'))
-                clauses.append(
+                    representations.append(tags_expression.ilike(f'%"{tag}"%'))
+                representations.append(
                     exists().where(
                         MaterialTag.material_id == Material.id,
                         MaterialTag.tag_id == Tag.id,
@@ -99,7 +100,11 @@ class MaterialRepository:
                         func.lower(Tag.name) == tag.casefold(),
                     )
                 )
-            statement = statement.where(or_(*clauses))
+                required_tag_clauses.append(or_(*representations))
+            # OR is used only between the JSON/legacy representations of one
+            # tag. Separate selected tags are passed as separate WHERE
+            # predicates, so every selected tag must be present (AND).
+            statement = statement.where(*required_tag_clauses)
         if source:
             statement = statement.where(func.lower(Material.source) == source.strip().lower())
         if uploaded_from:

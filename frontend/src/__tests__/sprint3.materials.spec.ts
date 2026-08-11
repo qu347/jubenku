@@ -50,7 +50,7 @@ describe('素材上传抽屉', () => {
     'el-drawer': { template: '<div><slot/><slot name="footer"/></div>', props: ['modelValue'] },
     'el-form': { template: '<form><slot/></form>' }, 'el-form-item': { template: '<label><slot/></label>' },
     'el-select': { template: '<select><slot/></select>' }, 'el-option': { template: '<option />' },
-    'el-input': { template: '<input />' }, 'el-progress': { template: '<div class="progress-stub" />' },
+    'el-input': { props: ['modelValue'], emits: ['update:modelValue'], template: '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />' }, 'el-progress': { template: '<div class="progress-stub" />' },
   }
 
   it('选择多个文件后渲染待上传文件列表', async () => {
@@ -68,6 +68,11 @@ describe('素材上传抽屉', () => {
     const input = wrapper.find('input[type="file"]')
     Object.defineProperty(input.element, 'files', { value: [new File(['a'], '成功.txt'), new File(['b'], '失败.exe')], configurable: true })
     await input.trigger('change')
+    await wrapper.get('[data-testid="story-summary-input"]').setValue('剧情摘要')
+    await wrapper.get('[data-testid="uploaded-by-input"]').setValue('张三')
+    await wrapper.get('[data-testid="project-owner-input"]').setValue('李制片')
+    await wrapper.findAll('button').find((button) => button.text() === '逆袭')!.trigger('click')
+    await wrapper.findAll('button').find((button) => button.text() === '现代')!.trigger('click')
     await wrapper.findAll('button').at(-1)?.trigger('click')
     await flushPromises()
     expect(wrapper.text()).toContain('不允许的扩展名')
@@ -163,9 +168,33 @@ describe('旧素材详情兼容', () => {
         },
       },
     })
-    expect(wrapper.text()).toContain('旧素材摘要')
     expect(wrapper.text()).toContain('旧素材中文摘要')
-    expect(wrapper.text()).toContain('旧素材正文')
+    expect(wrapper.text()).toContain('剧情正文')
     expect(wrapper.text()).toContain('升级后仍然可见')
+  })
+
+  it('Markdown 正文未随列表返回时只显示文件预览，不叠加不可预览提示', () => {
+    const wrapper = mount(MaterialDetailDrawer, {
+      props: {
+        modelValue: true,
+        material: { ...material, file_extension: 'md', original_filename: '剧情.md', content_text: '', legacy_content: '' },
+        modules: [],
+      },
+      global: {
+        stubs: {
+          MaterialPreview: { template: '<div>Markdown 文件正文</div>' },
+          'el-drawer': { template: '<div><slot/><slot name="footer"/></div>' },
+          'el-button': { template: '<button><slot /></button>' },
+          'el-icon': { template: '<i><slot /></i>' },
+          'el-form': { template: '<form><slot /></form>' },
+          'el-form-item': { template: '<label><slot /></label>' },
+          'el-input': { template: '<input />' },
+          'el-select': { template: '<select><slot /></select>' },
+          'el-option': { template: '<option />' },
+        },
+      },
+    })
+    expect(wrapper.text()).toContain('Markdown 文件正文')
+    expect(wrapper.text()).not.toContain('当前格式暂不支持直接阅读')
   })
 })

@@ -4,6 +4,7 @@ import math
 import mimetypes
 import os
 import zipfile
+from xml.etree import ElementTree
 from datetime import date, datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -51,7 +52,12 @@ class UploadRejected(Exception):
     pass
 
 
-def material_to_dict(material: Material) -> dict[str, Any]:
+def material_to_dict(
+    material: Material,
+    *,
+    content_text: str = "",
+    content_truncated: bool = False,
+) -> dict[str, Any]:
     genre_module = material.genre_module
     legacy_tags = [
         link.tag.name
@@ -78,6 +84,10 @@ def material_to_dict(material: Material) -> dict[str, Any]:
         "legacy_content": material.content if not material.storage_path else "",
         "tags": list(material.tags_json or []) or legacy_tags,
         "source": material.source,
+        "uploaded_by": material.uploaded_by,
+        "project_owner": material.project_owner,
+        "content_text": content_text,
+        "content_truncated": content_truncated,
         "original_filename": material.original_filename,
         "stored_filename": material.stored_filename,
         "storage_path": material.storage_path,
@@ -257,6 +267,9 @@ class MaterialService:
         tags: list[str],
         source: str,
         description: str,
+        title: str = "",
+        uploaded_by: str = "",
+        project_owner: str = "",
     ) -> dict[str, Any]:
         genre_module = self._require_module(genre_module_id)
         materials: list[dict[str, Any]] = []
@@ -267,16 +280,19 @@ class MaterialService:
             try:
                 display_filename = self._safe_original_filename(upload.filename)
                 file_values, final_path = await self._store_file(upload)
-                title = Path(file_values["original_filename"]).stem[:100] or "未命名素材"
+                derived_title = Path(file_values["original_filename"]).stem[:100] or "未命名素材"
+                display_title = title.strip()[:100] if title.strip() and len(files) == 1 else derived_title
                 material = self.repository.create(
                     {
                         "genre_module_id": genre_module_id,
                         "genre_module": genre_module,
-                        "title": title,
+                        "title": display_title,
                         "material_type": material_type.strip(),
                         "description": description.strip(),
                         "tags_json": tags,
                         "source": source.strip(),
+                        "uploaded_by": uploaded_by.strip(),
+                        "project_owner": project_owner.strip(),
                         **file_values,
                     }
                 )
@@ -372,8 +388,40 @@ class MaterialService:
             "pages": math.ceil(total / page_size) if total else 0,
         }
 
+    def _content_preview(self, material: Material, limit: int = 500_000) -> tuple[str, bool]:
+        if not material.storage_path:
+            return "", False
+        path = self._resolve_storage_path(material.storage_path)
+        if not path or not path.is_file():
+            return "", False
+        try:
+            if material.file_extension in {".txt", ".md", ".csv"}:
+                raw = path.read_bytes()
+                text = raw.decode("utf-8-sig")
+            elif material.file_extension == ".docx":
+                with zipfile.ZipFile(path) as archive:
+                    root = ElementTree.fromstring(archive.read("word/document.xml"))
+                paragraphs: list[str] = []
+                namespace = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+                for paragraph in root.iter(f"{namespace}p"):
+                    line = "".join(node.text or "" for node in paragraph.iter(f"{namespace}t"))
+                    if line:
+                        paragraphs.append(line)
+                text = "\n".join(paragraphs)
+            else:
+                return "", False
+        except (OSError, UnicodeDecodeError, KeyError, zipfile.BadZipFile, ElementTree.ParseError):
+            return "", False
+        return text[:limit], len(text) > limit
+
     def get(self, material_id: str) -> dict[str, Any]:
-        return material_to_dict(self._get(material_id))
+        material = self._get(material_id)
+        content_text, content_truncated = self._content_preview(material)
+        return material_to_dict(
+            material,
+            content_text=content_text,
+            content_truncated=content_truncated,
+        )
 
     def update(self, material_id: str, payload: MaterialUpdate) -> dict[str, Any]:
         material = self._get(material_id)

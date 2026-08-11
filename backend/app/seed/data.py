@@ -21,13 +21,5 @@ DEFAULT_GENRE_MODULES: list[dict[str, Any]] = [
 
 
 DEFAULT_SECTIONS: list[dict[str, Any]] = [
-    {"section_key": "overview", "section_name": "概览", "icon": "DataBoard", "field_schema": []},
-    {"section_key": "audience", "section_name": "受众定位", "icon": "UserFilled", "field_schema": []},
-    {"section_key": "elements", "section_name": "创作元素", "icon": "MagicStick", "field_schema": []},
-    {"section_key": "characters", "section_name": "人物素材", "icon": "User", "field_schema": []},
-    {"section_key": "plots", "section_name": "剧情素材", "icon": "Flag", "field_schema": []},
-    {"section_key": "scenes", "section_name": "场景素材", "icon": "Location", "field_schema": []},
-    {"section_key": "dialogues", "section_name": "对白素材", "icon": "ChatLineSquare", "field_schema": []},
-    {"section_key": "worldview", "section_name": "世界观素材", "icon": "Connection", "field_schema": []},
-    {"section_key": "references", "section_name": "参考资料", "icon": "Link", "field_schema": []},
+    {"section_key": "title", "section_name": "标题", "icon": "Document", "field_schema": []},
 ]

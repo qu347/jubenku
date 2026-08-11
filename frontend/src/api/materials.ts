@@ -21,9 +21,12 @@ export function uploadMaterials(payload: MaterialUploadPayload, onProgress?: (pe
   payload.files.forEach((file) => form.append('files', file))
   form.append('genre_module_id', payload.genre_module_id)
   form.append('material_type', payload.material_type)
+  form.append('title', payload.title || '')
   form.append('tags', JSON.stringify(payload.tags))
   form.append('source', payload.source)
   form.append('description', payload.description)
+  form.append('uploaded_by', payload.uploaded_by || '')
+  form.append('project_owner', payload.project_owner || '')
   return request<MaterialUploadResult>({
     method: 'POST', url: '/materials/upload', data: form, timeout: 10 * 60 * 1000,
     onUploadProgress: (event) => {

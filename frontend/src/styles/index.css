@@ -45,6 +45,7 @@ html, body, #app { min-width: 320px; min-height: 100%; margin: 0; }
 body {
   background: var(--bg);
   color: var(--text);
+  font-size: 14px;
   font-family: Inter, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -60,7 +61,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .subtle-label { color: var(--text-muted); font-size: 12px; font-weight: 600; letter-spacing: .04em; }
 .truncate-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
-.el-button { border-radius: 8px; font-weight: 600; }
+.el-button { border-radius: 8px; font-size: 13px; font-weight: 600; }
+.el-input__inner, .el-select__selected-item, .el-select__placeholder, .el-textarea__inner, .el-form-item__label { font-size: 13px !important; }
 .el-button--primary { --el-button-bg-color: var(--accent); --el-button-border-color: var(--accent); --el-button-hover-bg-color: var(--accent-hover); --el-button-hover-border-color: var(--accent-hover); color: #17110a; }
 .el-input__wrapper, .el-select__wrapper, .el-textarea__inner { background: var(--panel-raised) !important; box-shadow: 0 0 0 1px var(--border) inset !important; color: var(--text) !important; border-radius: 8px !important; }
 .el-input__inner, .el-select__placeholder, .el-select__selected-item, .el-textarea__inner { color: var(--text) !important; }

@@ -42,6 +42,8 @@ class Material(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     description: Mapped[str] = mapped_column(Text, default="", nullable=False)
     tags_json: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     source: Mapped[str] = mapped_column(String(200), default="", nullable=False, index=True)
+    uploaded_by: Mapped[str] = mapped_column(String(100), default="", nullable=False, index=True)
+    project_owner: Mapped[str] = mapped_column(String(100), default="", nullable=False, index=True)
     original_filename: Mapped[str] = mapped_column(String(255), default="", nullable=False, index=True)
     stored_filename: Mapped[str] = mapped_column(String(255), default="", nullable=False, index=True)
     storage_path: Mapped[str] = mapped_column(String(500), default="", nullable=False)

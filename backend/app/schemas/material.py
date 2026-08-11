@@ -37,6 +37,8 @@ class MaterialUpdate(BaseModel):
     tags: list[str] | None = None
     source: str | None = Field(default=None, max_length=200)
     description: str | None = Field(default=None, max_length=20_000)
+    uploaded_by: str | None = Field(default=None, max_length=100)
+    project_owner: str | None = Field(default=None, max_length=100)
 
     model_config = ConfigDict(extra="forbid")
 
@@ -50,7 +52,7 @@ class MaterialUpdate(BaseModel):
             raise ValueError("字段不能为空")
         return value
 
-    @field_validator("source", "description")
+    @field_validator("source", "description", "uploaded_by", "project_owner")
     @classmethod
     def strip_optional_text(cls, value: str | None) -> str | None:
         return value.strip() if value is not None else None
@@ -72,6 +74,10 @@ class MaterialRead(BaseModel):
     legacy_content: str
     tags: list[str]
     source: str
+    uploaded_by: str
+    project_owner: str
+    content_text: str
+    content_truncated: bool
     original_filename: str
     stored_filename: str
     storage_path: str

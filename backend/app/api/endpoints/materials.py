@@ -76,18 +76,24 @@ async def upload_materials(
     files: Annotated[list[UploadFile], File(min_length=1)],
     genre_module_id: Annotated[UUID | None, Form()] = None,
     material_type: Annotated[str, Form(min_length=1, max_length=30)] = "参考资料",
+    title: Annotated[str, Form(max_length=100)] = "",
     tags: Annotated[list[str], Form()] = [],
     source: Annotated[str, Form(max_length=200)] = "",
     description: Annotated[str, Form(max_length=20_000)] = "",
+    uploaded_by: Annotated[str, Form(max_length=100)] = "",
+    project_owner: Annotated[str, Form(max_length=100)] = "",
     session: Session = Depends(get_db),
 ) -> dict[str, Any]:
     data = await MaterialService(session).upload(
         files=files,
         genre_module_id=str(genre_module_id) if genre_module_id else None,
         material_type=material_type,
+        title=title,
         tags=_parse_values(tags),
         source=source,
         description=description,
+        uploaded_by=uploaded_by,
+        project_owner=project_owner,
     )
     return {"success": True, "data": data, "message": "素材文件处理完成", "error": None}
 
@@ -168,4 +174,3 @@ def delete_material(material_id: UUID, session: Session = Depends(get_db)) -> di
         "message": "素材及物理文件已删除",
         "error": None,
     }
-

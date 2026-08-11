@@ -91,8 +91,5 @@ def test_list_module_sections(client: TestClient) -> None:
     response = client.get(f"/api/genre-modules/{module['id']}/sections")
     assert response.status_code == 200
     sections = response.json()["data"]
-    assert len(sections) == 9
-    assert [item["section_name"] for item in sections] == [
-        "概览", "受众定位", "创作元素", "人物素材", "剧情素材",
-        "场景素材", "对白素材", "世界观素材", "参考资料",
-    ]
+    assert len(sections) == 1
+    assert [item["section_name"] for item in sections] == ["标题"]

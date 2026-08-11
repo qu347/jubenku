@@ -110,6 +110,40 @@ def test_single_and_multiple_upload(client: TestClient, db_session: Session) -> 
     assert response.json()["data"]["success_count"] == 2
 
 
+def test_story_metadata_and_text_content_are_returned(client: TestClient, db_session: Session) -> None:
+    module = create_module(db_session)
+    response = upload(
+        client,
+        module,
+        [("story.md", "# 灰塔守钟人\n钟声响起，失踪者的名字浮现在塔壁。".encode("utf-8"), "text/markdown")],
+        title="灰塔守钟人",
+        material_type="剧情",
+        tags='["剧情:悬疑", "时代背景:架空", "角色设定:小人物"]',
+        description="守钟人发现每次钟响都会抹去一段城市记忆。",
+        uploaded_by="张三",
+        project_owner="李制片",
+    )
+    assert response.status_code == 200
+    created = response.json()["data"]["materials"][0]
+    assert created["title"] == "灰塔守钟人"
+    assert created["uploaded_by"] == "张三"
+    assert created["project_owner"] == "李制片"
+
+    detail = client.get(f"/api/materials/{created['id']}")
+    assert detail.status_code == 200
+    payload = detail.json()["data"]
+    assert "失踪者的名字" in payload["content_text"]
+    assert payload["content_truncated"] is False
+
+    updated = client.patch(
+        f"/api/materials/{created['id']}",
+        json={"uploaded_by": "王编辑", "project_owner": "赵导演"},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["data"]["uploaded_by"] == "王编辑"
+    assert updated.json()["data"]["project_owner"] == "赵导演"
+
+
 def test_partial_upload_failure_and_no_residue(client: TestClient, db_session: Session) -> None:
     module = create_module(db_session)
     response = upload(
@@ -274,6 +308,37 @@ def test_material_list_pagination_filters_and_keyword(client: TestClient, db_ses
         "/api/materials", params={"uploaded_from": today, "uploaded_to": today}
     ).json()["data"]
     assert by_date["total"] == 3
+
+
+def test_material_list_requires_all_selected_tags(client: TestClient, db_session: Session) -> None:
+    module = create_module(db_session)
+    upload(
+        client,
+        module,
+        [("both.md", b"both", "text/markdown")],
+        tags='["剧情:逆袭", "角色设定:真假千金"]',
+    )
+    upload(
+        client,
+        module,
+        [("plot-only.md", b"plot", "text/markdown")],
+        tags='["剧情:逆袭", "角色设定:小人物"]',
+    )
+    upload(
+        client,
+        module,
+        [("role-only.md", b"role", "text/markdown")],
+        tags='["剧情:马甲", "角色设定:真假千金"]',
+    )
+
+    response = client.get(
+        "/api/materials",
+        params={"tags": "剧情:逆袭,角色设定:真假千金"},
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["total"] == 1
+    assert data["items"][0]["original_filename"] == "both.md"
 
 
 def test_legacy_content_material_is_visible_without_attachment(client: TestClient, db_session: Session) -> None:

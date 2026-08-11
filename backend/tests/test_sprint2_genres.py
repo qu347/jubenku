@@ -47,7 +47,7 @@ def test_get_module_by_slug(client: TestClient) -> None:
     response = client.get("/api/genre-modules/slug/rule-horror")
     assert response.status_code == 200
     assert response.json()["data"]["slug"] == "rule-horror"
-    assert len(response.json()["data"]["sections"]) == 9
+    assert [item["section_name"] for item in response.json()["data"]["sections"]] == ["标题"]
 
 
 def test_missing_slug_returns_404(client: TestClient) -> None:
@@ -88,7 +88,7 @@ def test_duplicate_module_and_sections(client: TestClient) -> None:
     assert duplicate["status"] == "inactive"
     assert duplicate["visible"] is False
     sections = client.get(f"/api/genre-modules/{duplicate['id']}/sections?include_disabled=true").json()["data"]
-    assert len(sections) == 9
+    assert [item["section_name"] for item in sections] == ["标题"]
 
 
 def test_duplicate_module_generates_unique_slug(client: TestClient) -> None:
@@ -142,17 +142,19 @@ def test_different_modules_allow_same_section_key(client: TestClient) -> None:
 
 def test_disabled_section_filtered_from_detail(client: TestClient) -> None:
     module = create_module(client, name="禁用板块", slug="disabled-section")
+    create_section(client, module["id"], "backup", "备用板块")
     sections = client.get(f"/api/genre-modules/{module['id']}/sections").json()["data"]
     section = sections[0]
-    client.post(f"/api/module-sections/{section['id']}/disable")
+    assert client.post(f"/api/module-sections/{section['id']}/disable").status_code == 200
     detail = client.get("/api/genre-modules/slug/disabled-section").json()["data"]
     assert section["id"] not in [item["id"] for item in detail["sections"]]
 
 
 def test_include_disabled_returns_disabled_section(client: TestClient) -> None:
     module = create_module(client, name="查询禁用板块", slug="include-disabled")
+    create_section(client, module["id"], "backup", "备用板块")
     section = client.get(f"/api/genre-modules/{module['id']}/sections").json()["data"][0]
-    client.post(f"/api/module-sections/{section['id']}/disable")
+    assert client.post(f"/api/module-sections/{section['id']}/disable").status_code == 200
     detail = client.get("/api/genre-modules/slug/include-disabled?include_disabled=true").json()["data"]
     assert section["id"] in [item["id"] for item in detail["sections"]]
 

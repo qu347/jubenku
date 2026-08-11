@@ -40,6 +40,9 @@ sprint3_storage/
 sprint3_acceptance_fixtures/
 script_material_data/
 .runtime/
+outputs/
+portable_data/
+PACKAGE_README.txt
 
 # Runtime logs
 *.log

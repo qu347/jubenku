@@ -17,6 +17,10 @@ export interface Material {
   tags: string[]
   tags_json?: string[]
   source: string
+  uploaded_by?: string
+  project_owner?: string
+  content_text?: string
+  content_truncated?: boolean
   original_filename: string
   stored_filename: string
   storage_path: string
@@ -63,15 +67,20 @@ export interface MaterialUpdatePayload {
   tags_json?: string[]
   source?: string
   description?: string
+  uploaded_by?: string
+  project_owner?: string
 }
 
 export interface MaterialUploadPayload {
   files: File[]
   genre_module_id: string
   material_type: string
+  title?: string
   tags: string[]
   source: string
   description: string
+  uploaded_by?: string
+  project_owner?: string
 }
 
 export interface MaterialUploadFileResult {
