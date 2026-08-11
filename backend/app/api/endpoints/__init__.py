@@ -1,0 +1,3 @@
+from app.api.endpoints import genre_metrics, genre_modules, health, materials
+
+__all__ = ["genre_metrics", "genre_modules", "health", "materials"]

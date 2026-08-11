@@ -1,0 +1,60 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { Grid, List, Plus, Refresh } from '@element-plus/icons-vue'
+import MaterialUploadDrawer from '../../components/material/MaterialUploadDrawer.vue'
+import MaterialFilterBar from '../../components/material/MaterialFilterBar.vue'
+import MaterialTable from '../../components/material/MaterialTable.vue'
+import MaterialCardGrid from '../../components/material/MaterialCardGrid.vue'
+import MaterialDetailDrawer from '../../components/material/MaterialDetailDrawer.vue'
+import { downloadMaterial } from '../../api/materials'
+import { useMaterialsStore } from '../../stores/materials'
+import { useGenreModulesStore } from '../../stores/genreModules'
+import type { Material, MaterialFilters, MaterialSort } from '../../types/material'
+import { confirmDestructive } from '../../utils/confirm'
+
+const route=useRoute();const router=useRouter();const store=useMaterialsStore();const genreStore=useGenreModulesStore()
+const uploadOpen=ref(false);const detailOpen=ref(false);const selected=ref<Material|null>(null);const detailMode=ref<'view'|'edit'>('view');const saving=ref(false)
+const view=ref<'grid'|'table'>((localStorage.getItem('materials-view') as 'grid'|'table')||'table')
+const modules=computed(()=>genreStore.allModules.length?genreStore.allModules:genreStore.modules)
+const activeChips=computed(()=>Object.entries(store.filters).filter(([key,value])=>!['page','page_size','sort'].includes(key)&&value!==undefined&&value!==''))
+const sortOptions:[string,MaterialSort][]=[['最新上传','created_desc'],['最早上传','created_asc'],['最近更新','updated_desc'],['标题 A—Z','title_asc'],['文件从大到小','file_size_desc']]
+function queryString(value: unknown){return typeof value==='string'?value:undefined}
+function filtersFromQuery():MaterialFilters{return{keyword:queryString(route.query.keyword),genre_module_id:queryString(route.query.genre_module_id),material_type:queryString(route.query.material_type),file_extension:queryString(route.query.file_extension),tags:queryString(route.query.tags),source:queryString(route.query.source),uploaded_from:queryString(route.query.uploaded_from),uploaded_to:queryString(route.query.uploaded_to),sort:(queryString(route.query.sort) as MaterialSort)||'created_desc',page:Number(queryString(route.query.page)||1),page_size:Number(queryString(route.query.page_size)||20)}}
+function toQuery(filters:MaterialFilters){const query:Record<string,string>={};for(const [key,value] of Object.entries(filters)){if(value!==undefined&&value!==''&&value!==null){if(key==='page'&&value===1)continue;if(key==='page_size'&&value===20)continue;if(key==='sort'&&value==='created_desc')continue;query[key]=String(value)}}return query}
+async function apply(filters:MaterialFilters){await router.push({query:toQuery(filters)})}
+async function reset(){await router.push({query:{}})}
+async function changePage(page:number){await apply({...store.filters,page})}
+async function changeSort(value:MaterialSort){await apply({...store.filters,sort:value,page:1})}
+function switchView(next:'grid'|'table'){view.value=next;localStorage.setItem('materials-view',next)}
+function openDetail(item:Material,mode:'view'|'edit'='view'){selected.value=item;detailMode.value=mode;detailOpen.value=true}
+async function save(payload:Parameters<typeof store.update>[1]){if(!selected.value)return;saving.value=true;try{selected.value=await store.update(selected.value.id,payload);detailMode.value='view';ElMessage.success('素材元数据已更新')}finally{saving.value=false}}
+async function remove(item:Material){const scope=item.has_attachment?'数据库记录与物理文件':'数据库记录（该素材没有附件）';await confirmDestructive(`将永久删除“${item.title}”的${scope}，是否继续？`,'删除素材');await store.remove(item.id);if(selected.value?.id===item.id)detailOpen.value=false;ElMessage.success(item.has_attachment?'素材与物理文件已删除':'旧素材记录已删除')}
+async function download(item:Material){if(!item.has_attachment){ElMessage.info('该素材没有可下载的附件');return}try{const blob=await downloadMaterial(item.id);const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=item.original_filename;link.click();setTimeout(()=>URL.revokeObjectURL(url),0)}catch{ElMessage.error('下载失败，请稍后重试')}}
+function chipLabel(key:string,value:unknown){const labels:Record<string,string>={keyword:'关键词',genre_module_id:'题材',material_type:'素材类型',file_extension:'文件类型',tags:'标签',source:'来源',uploaded_from:'起始',uploaded_to:'截止'};const module=key==='genre_module_id'?modules.value.find(i=>i.id===value)?.name:value;return `${labels[key]||key}：${module}`}
+async function removeChip(key:string){const next={...store.filters,[key]:undefined,page:1};await apply(next)}
+watch(()=>route.query,async()=>{store.setFilters(filtersFromQuery());await store.fetchMaterials()},{immediate:true,deep:true})
+onMounted(()=>genreStore.fetchAllModules())
+</script>
+
+<template>
+  <div class="page-shell">
+    <header class="page-heading"><div><span class="eyebrow">ENTERPRISE ASSET LIBRARY</span><h1>素材库 <em>{{ store.total.toLocaleString() }}</em></h1><p>上传、筛选与维护企业内部创作参考文件。</p></div><div class="heading-actions"><el-button :icon="Refresh" :loading="store.loading" @click="store.fetchMaterials">刷新</el-button><el-button type="primary" :icon="Plus" @click="uploadOpen=true">上传素材</el-button></div></header>
+    <MaterialFilterBar :model-value="store.filters" :modules="modules" @apply="apply" @reset="reset" />
+    <div v-if="activeChips.length" class="filter-chips"><span>已选条件</span><button v-for="([key,value]) in activeChips" :key="key" @click="removeChip(key)">{{ chipLabel(key,value) }} ×</button></div>
+    <section class="list-panel surface">
+      <header><div><b>素材文件</b><span>{{ store.total }} 条记录</span></div><div class="list-tools"><el-select :model-value="store.filters.sort" style="width:130px" @change="changeSort"><el-option v-for="([label,value]) in sortOptions" :key="value" :label="label" :value="value" /></el-select><div class="view-switch"><button :class="{active:view==='table'}" title="表格视图" @click="switchView('table')"><el-icon><List/></el-icon></button><button :class="{active:view==='grid'}" title="卡片视图" @click="switchView('grid')"><el-icon><Grid/></el-icon></button></div></div></header>
+      <div v-if="store.error" class="state-box error"><b>素材列表加载失败</b><span>{{ store.error }}</span><el-button :icon="Refresh" @click="store.fetchMaterials">重新加载</el-button></div>
+      <div v-else-if="!store.loading&&!store.items.length" class="state-box"><div class="empty-mark">空</div><b>{{ activeChips.length?'没有符合条件的素材':'素材库还是空的' }}</b><span>{{ activeChips.length?'尝试清空部分筛选条件。':'上传第一个文件，建立团队共享素材资产。' }}</span><el-button v-if="activeChips.length" @click="reset">清空筛选</el-button><el-button v-else type="primary" @click="uploadOpen=true">上传素材</el-button></div>
+      <template v-else><MaterialTable v-if="view==='table'" :items="store.items" :loading="store.loading" @view="openDetail" @edit="item=>openDetail(item,'edit')" @download="download" @delete="remove"/><MaterialCardGrid v-else :items="store.items" :loading="store.loading" @view="openDetail" @edit="item=>openDetail(item,'edit')" @download="download" @delete="remove"/></template>
+      <footer v-if="store.total"><span>第 {{ store.filters.page }} / {{ Math.max(store.pages,1) }} 页</span><el-pagination background layout="prev,pager,next" :current-page="store.filters.page" :page-size="store.filters.page_size" :total="store.total" @current-change="changePage" /></footer>
+    </section>
+    <MaterialUploadDrawer v-model="uploadOpen" :modules="modules" />
+    <MaterialDetailDrawer v-model="detailOpen" :material="selected" :modules="modules" :initial-mode="detailMode" :saving="saving" @save="save" @download="download" />
+  </div>
+</template>
+
+<style scoped>
+.page-shell{max-width:1600px;margin:0 auto;padding:28px 30px 50px}.page-heading{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:18px}.eyebrow{color:var(--accent);font-size:8px;font-weight:800;letter-spacing:.18em}.page-heading h1{margin:5px 0 4px;font-family:"Songti SC",serif;font-size:27px}.page-heading h1 em{margin-left:8px;color:var(--text-muted);font:500 12px Inter,sans-serif}.page-heading p{margin:0;color:var(--text-muted);font-size:11px}.heading-actions{display:flex;gap:8px}.filter-chips{display:flex;align-items:center;gap:6px;min-height:39px;padding:8px 2px;color:var(--text-muted);font-size:9px}.filter-chips button{padding:4px 7px;border:1px solid color-mix(in srgb,var(--accent) 32%,var(--border));border-radius:99px;background:var(--accent-soft);color:var(--text-secondary);font-size:8px;cursor:pointer}.list-panel{margin-top:12px;border-radius:10px;overflow:hidden}.list-panel>header{min-height:58px;display:flex;align-items:center;justify-content:space-between;padding:11px 15px;border-bottom:1px solid var(--border-soft)}.list-panel>header b{font-size:12px}.list-panel>header span{margin-left:9px;color:var(--text-muted);font-size:9px}.list-tools{display:flex;gap:8px}.view-switch{display:flex;padding:3px;border:1px solid var(--border);border-radius:7px;background:var(--bg-soft)}.view-switch button{width:29px;border:0;border-radius:5px;background:transparent;color:var(--text-muted);cursor:pointer}.view-switch button.active{background:var(--panel-hover);color:var(--accent)}.list-panel :deep(.card-grid){padding:14px}.list-panel>footer{min-height:58px;display:flex;align-items:center;justify-content:space-between;padding:10px 15px;border-top:1px solid var(--border-soft)}.list-panel>footer>span{color:var(--text-muted);font-size:9px}.state-box{min-height:340px;display:grid;justify-items:center;align-content:center;gap:9px;padding:30px}.state-box b{font-size:13px}.state-box span{color:var(--text-muted);font-size:9px}.state-box.error b{color:var(--danger)}.empty-mark{width:50px;height:50px;display:grid;place-items:center;border:1px dashed var(--border);border-radius:50%;color:var(--text-muted);font-size:11px}@media(max-width:800px){.page-shell{padding:20px 16px}.page-heading{align-items:flex-start;gap:12px}.heading-actions{flex-shrink:0}}
+</style>

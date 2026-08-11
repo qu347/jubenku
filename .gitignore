@@ -1,0 +1,49 @@
+# Python
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.pytest_cache/
+backend/.pytest-tmp*/
+*.py[cod]
+
+# Local and production configuration. Examples remain versioned.
+backend/.env
+backend/.env.production
+**/.env.production
+!backend/.env.production.example
+
+# Databases and SQLite sidecar files
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo
+frontend/.pnpm-store/
+.pnpm-store/
+
+# Runtime data, uploads, backups and acceptance assets
+storage/
+uploads/
+backups/
+logs/
+temp/
+backend/storage/
+backend/uploads/
+backend/backups/
+backend/logs/
+backend/temp/
+sprint3_storage/
+sprint3_acceptance_fixtures/
+script_material_data/
+.runtime/
+
+# Runtime logs
+*.log
+
+# Editor and operating-system files
+.DS_Store
+Thumbs.db

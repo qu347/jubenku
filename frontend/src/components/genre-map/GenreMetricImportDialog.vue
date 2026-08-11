@@ -1,0 +1,19 @@
+<script setup lang="ts">
+import { ref, watch } from 'vue'
+import { UploadFilled } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { importGenreMetrics } from '../../api/genreMetrics'
+import type { GenreMetricImportResult } from '../../types/genreMetric'
+const open=defineModel<boolean>({required:true})
+const emit=defineEmits<{complete:[]}>()
+const input=ref<HTMLInputElement>();const file=ref<File|null>(null);const loading=ref(false);const result=ref<GenreMetricImportResult|null>(null)
+watch(open,value=>{if(value){file.value=null;result.value=null}})
+function choose(event:Event){const target=event.target as HTMLInputElement;const next=target.files?.[0];if(next){const extension=next.name.split('.').pop()?.toLowerCase();if(!['xlsx','csv'].includes(extension||'')){ElMessage.warning('仅支持 .xlsx 或 .csv 文件');target.value='';return}file.value=next;result.value=null}target.value=''}
+async function submit(){if(!file.value)return ElMessage.warning('请选择导入文件');loading.value=true;try{result.value=await importGenreMetrics(file.value);if(result.value.failure_count)ElMessage.warning(`成功 ${result.value.success_count} 行，失败 ${result.value.failure_count} 行`);else ElMessage.success(`成功导入 ${result.value.success_count} 行`);if(result.value.success_count)emit('complete')}finally{loading.value=false}}
+</script>
+
+<template><el-dialog v-model="open" title="导入定位数据" width="650px"><div class="import-body"><div class="tip"><b>支持 Excel 与 CSV 模板</b><span>每一行独立校验；错误行不会写入数据库，合法行仍会正常导入。</span></div><button class="file-pick" @click="input?.click()"><el-icon><UploadFilled/></el-icon><b>{{ file?.name||'点击选择 .xlsx 或 .csv 文件' }}</b><span v-if="file">{{ (file.size/1024).toFixed(1) }} KB</span><span v-else>请先使用页面顶部的“下载模板”获取固定列名</span></button><input ref="input" hidden type="file" accept=".xlsx,.csv" @change="choose"><section v-if="result" class="result"><header><div><small>成功</small><b>{{ result.success_count }}</b></div><div :class="{failed:result.failure_count}"><small>失败</small><b>{{ result.failure_count }}</b></div></header><div v-if="result.errors.length" class="errors"><h3>失败行明细</h3><div v-for="item in result.errors" :key="`${item.row}-${item.field}`"><b>第 {{ item.row }} 行</b><span>{{ item.field||'整行' }}</span><p>{{ item.reason||item.message }}</p></div></div></section></div><template #footer><el-button @click="open=false">关闭</el-button><el-button type="primary" :loading="loading" :disabled="!file" @click="submit">开始导入</el-button></template></el-dialog></template>
+
+<style scoped>
+.import-body{padding:2px 2px 10px}.tip{display:grid;gap:4px;padding:12px;border-left:2px solid var(--accent);background:var(--accent-soft)}.tip b{font-size:10px}.tip span{color:var(--text-muted);font-size:8px}.file-pick{width:100%;height:120px;display:grid;place-items:center;align-content:center;gap:7px;margin:14px 0;border:1px dashed var(--border);border-radius:9px;background:var(--panel-raised);color:var(--text);cursor:pointer}.file-pick:hover{border-color:var(--accent)}.file-pick .el-icon{font-size:27px;color:var(--accent)}.file-pick b{font-size:10px}.file-pick span{color:var(--text-muted);font-size:8px}.result{border:1px solid var(--border-soft);border-radius:8px;overflow:hidden}.result>header{display:grid;grid-template-columns:1fr 1fr;background:var(--panel-raised)}.result>header div{display:flex;align-items:center;justify-content:center;gap:8px;padding:11px}.result>header small{color:var(--text-muted);font-size:8px}.result>header b{color:#34d399;font-size:16px}.result>header .failed b{color:var(--danger)}.errors{max-height:250px;overflow:auto;padding:10px}.errors h3{margin:0 0 7px;font-size:9px}.errors>div{display:grid;grid-template-columns:65px 90px 1fr;gap:7px;padding:7px;border-top:1px solid var(--border-soft);font-size:8px}.errors span{color:var(--accent)}.errors p{margin:0;color:var(--danger)}
+</style>
