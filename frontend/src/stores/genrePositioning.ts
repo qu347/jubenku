@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { getGenrePositioningTimeline, listGenrePositioning } from '../api/genrePositioning'
+import { useUploadPlatformsStore } from './uploadPlatforms'
 import type { GenrePositioningTimeline } from '../types/genrePositioning'
 
 const emptyTimeline = (): GenrePositioningTimeline => ({
@@ -17,6 +18,7 @@ function platformKey(value: string) {
 }
 
 export const useGenrePositioningStore = defineStore('genre-positioning', () => {
+  const uploadPlatformCatalog = useUploadPlatformsStore()
   const platforms = ref<string[]>([])
   const selectedPlatform = ref('')
   const timeline = ref<GenrePositioningTimeline>(emptyTimeline())
@@ -28,8 +30,14 @@ export const useGenrePositioningStore = defineStore('genre-positioning', () => {
     loading.value = true
     error.value = null
     try {
+      await uploadPlatformCatalog.fetchPlatforms().catch(() => undefined)
       const result = await listGenrePositioning()
       const unique = new Map<string, string>()
+      for (const platform of uploadPlatformCatalog.platforms) {
+        const display = platform.trim()
+        const key = platformKey(display)
+        if (key && !unique.has(key)) unique.set(key, display)
+      }
       for (const item of result.items) {
         const display = item.upload_platform.trim()
         const key = platformKey(display)

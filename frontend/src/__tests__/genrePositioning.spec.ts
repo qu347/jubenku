@@ -9,7 +9,9 @@ import { useGenrePositioningStore } from '../stores/genrePositioning'
 import type { GenrePositioningTimeline } from '../types/genrePositioning'
 
 const api = vi.hoisted(() => ({ listGenrePositioning: vi.fn(), getGenrePositioningTimeline: vi.fn() }))
+const platformApi = vi.hoisted(() => ({ listUploadPlatforms: vi.fn(), createUploadPlatform: vi.fn() }))
 vi.mock('../api/genrePositioning', () => api)
+vi.mock('../api/uploadPlatforms', () => platformApi)
 
 const timeline: GenrePositioningTimeline = {
   upload_platform: '抖音',
@@ -40,12 +42,18 @@ describe('题材平台月度热度趋势', () => {
     vi.clearAllMocks()
     api.listGenrePositioning.mockResolvedValue(listResult())
     api.getGenrePositioningTimeline.mockImplementation(async (platform?: string) => ({ ...timeline, upload_platform: platform || '全部平台' }))
+    platformApi.listUploadPlatforms.mockResolvedValue([
+      { id: 'p1', name: '抖音', is_system: true },
+      { id: 'p2', name: '星河阅读', is_system: false },
+    ])
   })
 
   it('从有效素材汇总平台并自动包含自定义平台', async () => {
     const store = useGenrePositioningStore()
     await store.fetchPlatforms('自定义平台')
-    expect(store.platforms).toEqual(['全部平台', '抖音', '自定义平台'])
+    expect(store.platforms[0]).toBe('全部平台')
+    expect(store.platforms).toEqual(expect.arrayContaining(['抖音', '自定义平台', '星河阅读']))
+    expect(new Set(store.platforms).size).toBe(store.platforms.length)
     expect(store.selectedPlatform).toBe('自定义平台')
     expect(api.getGenrePositioningTimeline).toHaveBeenCalledWith('自定义平台')
   })
@@ -58,6 +66,16 @@ describe('题材平台月度热度趋势', () => {
     expect(store.platforms[0]).toBe('全部平台')
     expect(store.selectedPlatform).toBe('全部平台')
     expect(api.getGenrePositioningTimeline).toHaveBeenCalledWith(undefined)
+  })
+
+  it('没有素材数据的已保存平台也会出现在定位图选择器', async () => {
+    const store = useGenrePositioningStore()
+
+    await store.fetchPlatforms()
+
+    expect(store.platforms).toContain('星河阅读')
+    await store.selectPlatform('星河阅读')
+    expect(api.getGenrePositioningTimeline).toHaveBeenCalledWith('星河阅读')
   })
 
   it('生成每个题材一条平滑曲线，缺失月份为空且热度轴固定为0到100', () => {
