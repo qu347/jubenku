@@ -6,10 +6,19 @@ from sqlalchemy.orm import Session
 
 from app.database.session import get_db
 from app.schemas.common import ApiResponse
-from app.schemas.genre_positioning import GenrePositioningList
+from app.schemas.genre_positioning import GenrePositioningList, GenrePositioningTimeline
 from app.services.genre_positioning_service import GenrePositioningService
 
 router = APIRouter(prefix="/genre-positioning", tags=["genre-positioning"])
+
+
+@router.get("/timeline", response_model=ApiResponse[GenrePositioningTimeline])
+def get_genre_positioning_timeline(
+    upload_platform: str | None = Query(default=None, max_length=60),
+    session: Session = Depends(get_db),
+) -> dict[str, Any]:
+    data = GenrePositioningService(session).timeline(upload_platform=upload_platform)
+    return {"success": True, "data": data, "message": "题材平台时间线获取成功", "error": None}
 
 
 @router.get("", response_model=ApiResponse[GenrePositioningList])

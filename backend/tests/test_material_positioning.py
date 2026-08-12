@@ -32,6 +32,7 @@ def create_material(db_session: Session):
         heat: float | None = 80,
         library_type: str = "material",
         deleted: bool = False,
+        created_at: str | None = None,
     ) -> Material:
         if genre is None:
             suffix = uuid4().hex
@@ -49,6 +50,9 @@ def create_material(db_session: Session):
         )
         db_session.add(material)
         db_session.commit()
+        if created_at is not None:
+            material.created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            db_session.commit()
         return material
 
     return factory
@@ -285,3 +289,87 @@ def test_material_update_rejects_incomplete_platform_metadata(
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "incomplete_platform_metadata"
+
+
+def test_timeline_groups_selected_platform_by_genre_and_upload_month(
+    client, create_material, db_session: Session
+) -> None:
+    fantasy = create_material(platform="TikTok", heat=80, created_at="2026-06-03T00:00:00Z")
+    mystery = create_material(platform="tiktok", heat=95, created_at="2026-06-15T00:00:00Z")
+    fantasy.genre_module.name = "Alpha"
+    mystery.genre_module.name = "Beta"
+    db_session.commit()
+    create_material(
+        genre=fantasy.genre_module,
+        platform="  tiktok  ",
+        heat=100,
+        created_at="2026-06-20T00:00:00Z",
+    )
+    create_material(
+        genre=fantasy.genre_module,
+        platform="tiktok",
+        heat=70,
+        created_at="2026-08-01T00:00:00Z",
+    )
+    create_material(
+        genre=fantasy.genre_module,
+        platform="快手",
+        heat=99,
+        created_at="2026-06-10T00:00:00Z",
+    )
+    create_material(
+        genre=fantasy.genre_module,
+        platform="tiktok",
+        heat=99,
+        library_type="script",
+        created_at="2026-06-10T00:00:00Z",
+    )
+    create_material(
+        genre=fantasy.genre_module,
+        platform="tiktok",
+        heat=99,
+        deleted=True,
+        created_at="2026-06-10T00:00:00Z",
+    )
+    create_material(
+        genre=fantasy.genre_module,
+        platform=None,
+        heat=None,
+        created_at="2026-06-10T00:00:00Z",
+    )
+    inactive = create_material(platform="tiktok", heat=99, created_at="2026-06-10T00:00:00Z")
+    inactive.genre_module.status = "inactive"
+    db_session.commit()
+
+    response = client.get("/api/genre-positioning/timeline", params={"upload_platform": " TIKTOK "})
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["upload_platform"] == "tiktok"
+    assert data["periods"] == ["2026-06", "2026-08"]
+    assert [
+        (point["genre_module_id"], point["period"], point["average_heat"], point["material_count"])
+        for point in data["points"]
+    ] == [
+        (fantasy.genre_module.id, "2026-06", 90.0, 2),
+        (mystery.genre_module.id, "2026-06", 95.0, 1),
+        (fantasy.genre_module.id, "2026-08", 70.0, 1),
+    ]
+    assert data["total_materials"] == 4
+
+
+@pytest.mark.parametrize("params", [{}, {"upload_platform": "   "}])
+def test_timeline_requires_a_non_blank_platform(client, params: dict[str, str]) -> None:
+    response = client.get("/api/genre-positioning/timeline", params=params)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "platform_required"
+
+
+def test_positioning_lists_custom_platform_for_platform_dropdown(client, create_material) -> None:
+    material = create_material(platform="  自定义站点  ", heat=88)
+
+    response = client.get("/api/genre-positioning")
+
+    assert response.status_code == 200
+    assert response.json()["data"]["items"][0]["upload_platform"] == "自定义站点"

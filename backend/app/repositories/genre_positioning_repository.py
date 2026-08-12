@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models import GenreModule, Material
 
@@ -104,3 +104,22 @@ class GenrePositioningRepository:
             )
         )
         return [dict(row) for row in self.session.execute(statement).mappings()]
+
+    def timeline(self, upload_platform: str) -> list[Material]:
+        normalized_platform = func.lower(func.trim(Material.upload_platform))
+        statement = (
+            select(Material)
+            .join(GenreModule, GenreModule.id == Material.genre_module_id)
+            .options(joinedload(Material.genre_module))
+            .where(
+                Material.deleted_at.is_(None),
+                Material.library_type == "material",
+                Material.upload_platform.is_not(None),
+                func.trim(Material.upload_platform) != "",
+                Material.platform_heat.is_not(None),
+                GenreModule.deleted_at.is_(None),
+                GenreModule.status == "active",
+                normalized_platform == upload_platform.strip().casefold(),
+            )
+        )
+        return list(self.session.scalars(statement))
