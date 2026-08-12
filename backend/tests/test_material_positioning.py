@@ -358,7 +358,41 @@ def test_timeline_groups_selected_platform_by_genre_and_upload_month(
     assert data["total_materials"] == 4
 
 
-@pytest.mark.parametrize("params", [{}, {"upload_platform": "   "}])
+def test_timeline_without_platform_aggregates_all_platforms_by_genre_and_month(
+    client, create_material
+) -> None:
+    first = create_material(platform="抖音", heat=40, created_at="2026-06-03T00:00:00Z")
+    create_material(
+        genre=first.genre_module,
+        platform="抖音",
+        heat=80,
+        created_at="2026-06-12T00:00:00Z",
+    )
+    create_material(
+        genre=first.genre_module,
+        platform="星河短剧",
+        heat=100,
+        created_at="2026-06-20T00:00:00Z",
+    )
+
+    response = client.get("/api/genre-positioning/timeline")
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["upload_platform"] == "全部平台"
+    assert data["periods"] == ["2026-06"]
+    assert data["points"] == [{
+        "genre_module_id": first.genre_module.id,
+        "genre_name": first.genre_module.name,
+        "theme_color": first.genre_module.theme_color,
+        "period": "2026-06",
+        "average_heat": 73.3,
+        "material_count": 3,
+    }]
+    assert data["total_materials"] == 3
+
+
+@pytest.mark.parametrize("params", [{"upload_platform": "   "}])
 def test_timeline_requires_a_non_blank_platform(client, params: dict[str, str]) -> None:
     response = client.get("/api/genre-positioning/timeline", params=params)
 

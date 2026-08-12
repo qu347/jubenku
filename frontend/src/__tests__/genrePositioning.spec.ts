@@ -39,15 +39,25 @@ describe('题材平台月度热度趋势', () => {
     localStorage.setItem('genre-map-view', 'chart')
     vi.clearAllMocks()
     api.listGenrePositioning.mockResolvedValue(listResult())
-    api.getGenrePositioningTimeline.mockImplementation(async (platform: string) => ({ ...timeline, upload_platform: platform }))
+    api.getGenrePositioningTimeline.mockImplementation(async (platform?: string) => ({ ...timeline, upload_platform: platform || '全部平台' }))
   })
 
   it('从有效素材汇总平台并自动包含自定义平台', async () => {
     const store = useGenrePositioningStore()
     await store.fetchPlatforms('自定义平台')
-    expect(store.platforms).toEqual(['抖音', '自定义平台'])
+    expect(store.platforms).toEqual(['全部平台', '抖音', '自定义平台'])
     expect(store.selectedPlatform).toBe('自定义平台')
     expect(api.getGenrePositioningTimeline).toHaveBeenCalledWith('自定义平台')
+  })
+
+  it('默认选择全部平台并请求跨平台题材趋势', async () => {
+    const store = useGenrePositioningStore()
+
+    await store.fetchPlatforms()
+
+    expect(store.platforms[0]).toBe('全部平台')
+    expect(store.selectedPlatform).toBe('全部平台')
+    expect(api.getGenrePositioningTimeline).toHaveBeenCalledWith(undefined)
   })
 
   it('生成每个题材一条平滑曲线，缺失月份为空且热度轴固定为0到100', () => {

@@ -36,7 +36,7 @@ class GenrePositioningRepository:
             )
         ]
 
-    def timeline(self, upload_platform: str) -> list[Material]:
+    def timeline(self, upload_platform: str | None) -> list[Material]:
         return self.list(genre_module_id=None, upload_platform=upload_platform)
 
     def _valid_materials(self) -> list[Material]:

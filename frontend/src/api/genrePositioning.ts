@@ -4,10 +4,10 @@ import type { GenrePositioningList, GenrePositioningTimeline } from '../types/ge
 export const listGenrePositioning = () =>
   request<GenrePositioningList>({ method: 'GET', url: '/genre-positioning' })
 
-export const getGenrePositioningTimeline = (uploadPlatform: string) =>
+export const getGenrePositioningTimeline = (uploadPlatform?: string) =>
   request<GenrePositioningTimeline>({
     method: 'GET',
     url: '/genre-positioning/timeline',
-    params: { upload_platform: uploadPlatform },
+    params: uploadPlatform ? { upload_platform: uploadPlatform } : undefined,
   })
 

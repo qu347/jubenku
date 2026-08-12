@@ -90,8 +90,8 @@ class GenrePositioningService:
         return {"items": items, "total": len(items)}
 
     def timeline(self, *, upload_platform: str | None) -> dict[str, Any]:
-        normalized_platform = upload_platform.strip() if upload_platform else ""
-        if not normalized_platform:
+        normalized_platform = upload_platform.strip() if upload_platform is not None else None
+        if upload_platform is not None and not normalized_platform:
             raise AppException(
                 "上传平台不能为空",
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -139,7 +139,11 @@ class GenrePositioningService:
 
         return {
             "upload_platform": (
-                latest_material.upload_platform.strip() if latest_material else normalized_platform
+                "全部平台"
+                if normalized_platform is None
+                else latest_material.upload_platform.strip()
+                if latest_material
+                else normalized_platform
             ),
             "periods": periods,
             "points": points,

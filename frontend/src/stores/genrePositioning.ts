@@ -10,6 +10,8 @@ const emptyTimeline = (): GenrePositioningTimeline => ({
   total_materials: 0,
 })
 
+export const ALL_PLATFORMS = '全部平台'
+
 function platformKey(value: string) {
   return value.trim().normalize('NFKC').toLocaleLowerCase()
 }
@@ -33,18 +35,13 @@ export const useGenrePositioningStore = defineStore('genre-positioning', () => {
         const key = platformKey(display)
         if (key && !unique.has(key)) unique.set(key, display)
       }
-      platforms.value = [...unique.values()].sort((a, b) => a.localeCompare(b, 'zh-CN'))
+      platforms.value = [ALL_PLATFORMS, ...[...unique.values()].sort((a, b) => a.localeCompare(b, 'zh-CN'))]
       const preferredKey = platformKey(preferredPlatform || '')
       const currentKey = platformKey(selectedPlatform.value)
-      const next = platforms.value.find((item) => platformKey(item) === preferredKey)
+      const next = (preferredKey && platforms.value.find((item) => platformKey(item) === preferredKey))
         || platforms.value.find((item) => platformKey(item) === currentKey)
-        || platforms.value[0]
-        || ''
-      if (next) await selectPlatform(next)
-      else {
-        selectedPlatform.value = ''
-        timeline.value = emptyTimeline()
-      }
+        || ALL_PLATFORMS
+      await selectPlatform(next)
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : '平台数据加载失败'
       platforms.value = []
@@ -56,17 +53,13 @@ export const useGenrePositioningStore = defineStore('genre-positioning', () => {
   }
 
   async function selectPlatform(platform: string) {
-    const value = platform.trim()
+    const value = platform.trim() || ALL_PLATFORMS
     selectedPlatform.value = value
     const token = ++requestToken
-    if (!value) {
-      timeline.value = emptyTimeline()
-      return
-    }
     loading.value = true
     error.value = null
     try {
-      const result = await getGenrePositioningTimeline(value)
+      const result = await getGenrePositioningTimeline(value === ALL_PLATFORMS ? undefined : value)
       if (token === requestToken) {
         timeline.value = result
         selectedPlatform.value = result.upload_platform

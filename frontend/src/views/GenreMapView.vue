@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Grid, List } from '@element-plus/icons-vue'
 import GenreHeatTrendChart from '../components/genre-map/GenreHeatTrendChart.vue'
 import GenrePositioningTable from '../components/genre-map/GenrePositioningTable.vue'
-import { useGenrePositioningStore } from '../stores/genrePositioning'
+import { ALL_PLATFORMS, useGenrePositioningStore } from '../stores/genrePositioning'
 import type { GenrePositioningTimelinePoint } from '../types/genrePositioning'
 
 const route = useRoute()
@@ -30,18 +30,20 @@ function setView(next: 'chart' | 'table') {
 }
 async function changePlatform(platform: string) {
   await store.selectPlatform(platform)
-  await router.replace({ query: platform ? { upload_platform: platform } : {} })
+  await router.replace({ query: platform && platform !== ALL_PLATFORMS ? { upload_platform: platform } : {} })
 }
 function viewMaterials(point: GenrePositioningTimelinePoint) {
+  const query: Record<string, string> = { genre_module_id: point.genre_module_id }
+  if (store.selectedPlatform !== ALL_PLATFORMS) query.upload_platform = store.selectedPlatform
   void router.push({
     path: '/materials',
-    query: { genre_module_id: point.genre_module_id, upload_platform: store.selectedPlatform },
+    query,
   })
 }
 
 watch(() => route.query.upload_platform, (value) => {
-  const platform = typeof value === 'string' ? value : ''
-  if (platform && platform !== store.selectedPlatform) void store.selectPlatform(platform)
+  const platform = typeof value === 'string' && value ? value : ALL_PLATFORMS
+  if (platform !== store.selectedPlatform) void store.selectPlatform(platform)
 })
 onMounted(() => store.fetchPlatforms(routePlatform()))
 </script>
