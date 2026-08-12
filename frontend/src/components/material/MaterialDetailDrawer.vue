@@ -53,7 +53,7 @@ function save() {
   const selections = decodeStandardTags(form.tags).selections
   if (!selections.plot.length) return ElMessage.warning('请至少选择一个剧情标签')
   if (!selections.era.length) return ElMessage.warning('请选择一个时代背景')
-  emit('save', {
+  const payload: MaterialUpdatePayload = {
     title,
     genre_module_id: form.genre_module_id,
     material_type: '剧情',
@@ -62,9 +62,16 @@ function save() {
     description: form.description.trim(),
     uploaded_by: form.uploaded_by.trim(),
     project_owner: form.project_owner.trim(),
-    upload_platform: form.upload_platform.trim() || null,
-    platform_heat: form.platform_heat,
-  })
+  }
+  if (props.libraryType === 'material') {
+    const uploadPlatform = form.upload_platform.trim() || null
+    const hasPlatform = uploadPlatform !== null
+    const hasHeat = form.platform_heat !== null && form.platform_heat !== undefined
+    if (hasPlatform !== hasHeat) return ElMessage.warning('请同时填写上传平台和平台热度，或同时清空')
+    payload.upload_platform = uploadPlatform
+    payload.platform_heat = hasHeat ? form.platform_heat : null
+  }
+  emit('save', payload)
 }
 function size(value: number) { return value < 1024 ** 2 ? `${(value / 1024).toFixed(1)} KB` : `${(value / 1024 ** 2).toFixed(1)} MB` }
 </script>

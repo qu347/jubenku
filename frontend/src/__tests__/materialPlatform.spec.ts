@@ -32,6 +32,53 @@ const ElTableColumnStub = defineComponent({
   template: '<div v-for="row in testTableRows" :key="row.id"><slot :row="row" /></div>',
 })
 
+const editDrawerStubs = {
+  MaterialPreview: true,
+  'el-drawer': { template: '<div><slot/><slot name="footer"/></div>' },
+  'el-button': { template: '<button><slot /></button>' },
+  'el-icon': true,
+  'el-form': { template: '<form><slot /></form>' },
+  'el-form-item': { template: '<label><slot /></label>' },
+  'el-input': true,
+  'el-select': {
+    props: ['modelValue', 'placeholder'],
+    emits: ['update:modelValue'],
+    template: '<input v-if="placeholder === \'选择或输入上传平台\'" data-test="edit-platform" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" /><select v-else :value="modelValue"><slot /></select>',
+  },
+  'el-option': true,
+  'el-input-number': {
+    props: ['modelValue'],
+    emits: ['update:modelValue'],
+    template: '<input data-test="edit-heat" type="number" :value="modelValue ?? \'\'" @input="$emit(\'update:modelValue\', $event.target.value === \'\' ? null : Number($event.target.value))" />',
+  },
+  StandardTagSelector: true,
+}
+
+function mountEditableDetail(libraryType: 'material' | 'script' = 'material') {
+  return mount(MaterialDetailDrawer, {
+    props: {
+      modelValue: true,
+      initialMode: 'edit',
+      libraryType,
+      material: {
+        ...material,
+        library_type: libraryType,
+        tags: ['剧情:逆袭', '时代背景:现代'],
+        uploaded_by: '张三',
+        project_owner: '李制片',
+        upload_platform: libraryType === 'material' ? '番茄小说' : null,
+        platform_heat: libraryType === 'material' ? 88 : null,
+      },
+      modules: [],
+    },
+    global: { stubs: editDrawerStubs },
+  })
+}
+
+async function clickDetailSave(wrapper: ReturnType<typeof mountEditableDetail>) {
+  await wrapper.findAll('button').find((button) => button.text() === '保存修改')!.trigger('click')
+}
+
 describe('素材平台 API', () => {
   beforeEach(() => { vi.clearAllMocks(); http.request.mockResolvedValue({}) })
 
@@ -83,6 +130,44 @@ describe('素材平台展示', () => {
     })
     expect(detail.get('[data-test="edit-platform"]').attributes('data-allow-create')).toBeDefined()
     expect(detail.get('[data-test="edit-heat"]').attributes()).toMatchObject({ min: '0', max: '100', step: '1' })
+  })
+
+  it('素材编辑阻止仅填写热度', async () => {
+    const detail = mountEditableDetail()
+
+    await detail.get('[data-test="edit-platform"]').setValue('')
+    await clickDetailSave(detail)
+    expect(detail.emitted('save')).toBeUndefined()
+  })
+
+  it('素材编辑阻止仅填写平台', async () => {
+    const detail = mountEditableDetail()
+
+    await detail.get('[data-test="edit-heat"]').setValue('')
+    await clickDetailSave(detail)
+    expect(detail.emitted('save')).toBeUndefined()
+  })
+
+  it('素材编辑接受平台热度为 0，也允许同时清空平台信息', async () => {
+    const detail = mountEditableDetail()
+
+    await detail.get('[data-test="edit-heat"]').setValue('0')
+    await clickDetailSave(detail)
+    expect(detail.emitted('save')?.[0]?.[0]).toMatchObject({ upload_platform: '番茄小说', platform_heat: 0 })
+
+    await detail.get('[data-test="edit-platform"]').setValue('')
+    await detail.get('[data-test="edit-heat"]').setValue('')
+    await clickDetailSave(detail)
+    expect(detail.emitted('save')?.[1]?.[0]).toMatchObject({ upload_platform: null, platform_heat: null })
+  })
+
+  it('剧本编辑保存不发送素材平台字段', async () => {
+    const detail = mountEditableDetail('script')
+    await clickDetailSave(detail)
+    const payload = detail.emitted('save')?.[0]?.[0] as Record<string, unknown>
+    expect(payload).toBeDefined()
+    expect(payload).not.toHaveProperty('upload_platform')
+    expect(payload).not.toHaveProperty('platform_heat')
   })
 
   it('表格紧凑展示平台和热度，旧记录提示待补充', () => {
