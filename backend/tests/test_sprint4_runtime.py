@@ -5,8 +5,6 @@ from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
 import io
 from pathlib import Path
-import shutil
-import tempfile
 
 import pytest
 from fastapi.testclient import TestClient
@@ -28,8 +26,9 @@ from app.services.material_service import MaterialService
 
 
 @pytest.fixture()
-def runtime_tmp_path() -> Generator[Path, None, None]:
-    path = Path(tempfile.mkdtemp(prefix="script_materials_runtime_test_"))
+def runtime_tmp_path(tmp_path: Path) -> Generator[Path, None, None]:
+    path = tmp_path / "runtime"
+    path.mkdir()
     try:
         yield path
     finally:
@@ -38,7 +37,6 @@ def runtime_tmp_path() -> Generator[Path, None, None]:
             if getattr(handler, "_script_materials_handler", False):
                 logger.removeHandler(handler)
                 handler.close()
-        shutil.rmtree(path, ignore_errors=True)
 
 
 def _runtime_settings(tmp_path: Path, **overrides: object) -> Settings:
@@ -309,6 +307,8 @@ def test_concurrent_uploads_keep_sqlite_and_storage_consistent(runtime_tmp_path:
                     tags=[],
                     source="concurrency-test",
                     description="",
+                    upload_platform="番茄小说",
+                    platform_heat=80,
                 )
             )
         finally:
@@ -317,7 +317,7 @@ def test_concurrent_uploads_keep_sqlite_and_storage_consistent(runtime_tmp_path:
     try:
         with ThreadPoolExecutor(max_workers=5) as executor:
             results = list(executor.map(upload, range(5)))
-        assert all(result["success_count"] == 1 for result in results)
+        assert all(result["success_count"] == 1 for result in results), results
         with session_factory() as verification_session:
             assert verification_session.scalar(select(func.count(Material.id))) == 5
             assert verification_session.execute(text("PRAGMA integrity_check")).scalar_one() == "ok"

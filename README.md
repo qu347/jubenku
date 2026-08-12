@@ -12,13 +12,13 @@
 | --- | --- |
 | `/materials` | 企业素材上传、筛选、预览、编辑、下载和物理删除 |
 | `/scripts` | 剧本上传、筛选、阅读、编辑、下载和物理删除 |
-| `/genre-map` | 年龄—学历气泡图、定位数据 CRUD、Excel/CSV 导入导出 |
+| `/genre-map` | 按上传平台查看各题材的月度平均热度趋势 |
 | `/settings/modules` | 素材题材与剧本题材双栏配置 |
 | `/genres/:slug` | 素材题材页面 |
 | `/script-genres/:slug` | 剧本题材页面 |
 | `/` | 重定向到 `/materials` |
 
-固定导航包含“素材库”“剧本库”“题材定位图”“题材配置”。其下提供“素材题材库”和“剧本题材库”两个独立下拉选择器；页面数据全部来自后端 API，不使用前端 Mock 业务数据。
+固定导航包含“素材库”“剧本库”“平台热度趋势”“题材配置”。其下提供“素材题材库”和“剧本题材库”两个独立下拉选择器；页面数据全部来自后端 API，不使用前端 Mock 业务数据。
 
 明确不包含：
 
@@ -38,7 +38,8 @@
 - 单文件或多文件上传；每个文件独立返回成功或失败结果。
 - 支持 PDF、DOCX、XLSX、CSV、TXT、Markdown、JPG、JPEG、PNG。
 - 默认单文件上限 100MB，可通过生产配置调整。
-- 按关键词、题材、素材类型、文件类型、标签、来源和上传时间组合筛选。
+- 素材上传时必须填写上传平台和 0—100 的平台热度；平台支持选择常用项或直接输入自定义值。
+- 按关键词、题材、素材类型、文件类型、上传平台、标签、来源和上传时间组合筛选。
 - 图片、TXT、Markdown 和 PDF 基础预览；Office 文件下载后本地打开。
 - 只允许通过 Material ID 下载，不接收客户端文件系统路径。
 - 服务端使用 UUID 文件名，数据库只保存相对路径。
@@ -51,13 +52,13 @@
 - 素材与剧本通过库类型严格隔离，列表数量和查询结果互不混入。
 - 旧数据自动归入素材库；剧本编辑完成的成稿从“剧本库”上传。
 
-### 题材定位
+### 平台热度趋势
 
-- 以平均年龄为横轴、学历层级为纵轴、用户占比为气泡大小。
-- 颜色表示学历层级，描边表示重点题材。
-- 支持平台、频道、周期、年龄、学历、趋势、重点状态和热度筛选。
-- 新增、查看、编辑和软删除定位数据。
-- Excel/CSV 模板下载、逐行校验导入、失败行明细和当前筛选结果导出。
+- 平台下拉框自动汇总素材库中已经填写的平台，自定义平台也会自动出现。
+- 选择一个平台后，每条平滑曲线代表一个题材；横轴为上传月份，纵轴为该月素材的平均平台热度（0—100）。
+- 没有素材的月份显示为空档，不按 0 计算；超过 12 个月时可横向缩放。
+- 悬停数据点显示平台、题材、月份、平均热度和素材数量。
+- 点击曲线数据点或表格操作可进入已按题材和平台筛选的素材库。
 
 ### 题材配置
 
@@ -114,15 +115,14 @@ DELETE /api/materials/{id}
 GET    /api/materials/{id}/download
 ```
 
-### 题材定位数据
+### 平台题材热度
 
 ```text
-GET/POST       /api/genre-metrics
-GET/PATCH/DELETE /api/genre-metrics/{id}
-GET            /api/genre-metrics/import-template
-POST           /api/genre-metrics/import
-GET            /api/genre-metrics/export
+GET /api/genre-positioning
+GET /api/genre-positioning/timeline?upload_platform=抖音
 ```
+
+旧的 `/api/genre-metrics` 接口仅为历史迁移兼容保留，当前页面不再使用年龄、学历、频道、周期或样本量等定位字段。
 
 交互式 API 文档默认位于 `/docs`。
 
@@ -221,6 +221,7 @@ http://企业服务器内网IP:8000/genre-map
 ## 文档
 
 - [产品规格](docs/PRODUCT_SPEC.md)
+- [上传平台与题材热度趋势](docs/PLATFORM_HEAT_TRENDS.md)
 - [Sprint 4 范围](docs/SPRINT_4.md)
 - [用户使用说明](docs/USER_GUIDE.md)
 - [Windows 生产部署](docs/DEPLOYMENT.md)

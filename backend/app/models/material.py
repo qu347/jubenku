@@ -1,6 +1,6 @@
 from typing import Any, TYPE_CHECKING
 
-from sqlalchemy import JSON, BigInteger, Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, BigInteger, Boolean, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base, SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
@@ -17,6 +17,8 @@ class Material(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     library_type: Mapped[str] = mapped_column(
         String(20), default="material", server_default="material", nullable=False, index=True
     )
+    upload_platform: Mapped[str | None] = mapped_column(String(60), nullable=True, index=True)
+    platform_heat: Mapped[float | None] = mapped_column(Float, nullable=True, index=True)
     genre_module_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("genre_modules.id", ondelete="SET NULL"), nullable=True, index=True
     )

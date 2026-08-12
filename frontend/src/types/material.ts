@@ -18,6 +18,8 @@ export interface Material {
   tags: string[]
   tags_json?: string[]
   source: string
+  upload_platform: string | null
+  platform_heat: number | null
   uploaded_by?: string
   project_owner?: string
   content_text?: string
@@ -46,6 +48,8 @@ export interface MaterialFilters {
   file_extension?: string
   tags?: string
   source?: string
+  upload_platform?: string | null
+  platform_heat?: number | null
   uploaded_from?: string
   uploaded_to?: string
   sort?: MaterialSort
@@ -71,11 +75,12 @@ export interface MaterialUpdatePayload {
   description?: string
   uploaded_by?: string
   project_owner?: string
+  upload_platform?: string | null
+  platform_heat?: number | null
 }
 
-export interface MaterialUploadPayload {
+interface MaterialUploadPayloadBase {
   files: File[]
-  library_type?: 'material' | 'script'
   genre_module_id: string
   material_type: string
   title?: string
@@ -85,6 +90,18 @@ export interface MaterialUploadPayload {
   uploaded_by?: string
   project_owner?: string
 }
+
+export type MaterialUploadPayload =
+  | (MaterialUploadPayloadBase & {
+    library_type?: 'material'
+    upload_platform: string
+    platform_heat: number
+  })
+  | (MaterialUploadPayloadBase & {
+    library_type: 'script'
+    upload_platform?: undefined
+    platform_heat?: undefined
+  })
 
 export interface MaterialUploadFileResult {
   filename: string

@@ -4,11 +4,12 @@ import { Refresh, Search } from '@element-plus/icons-vue'
 import StandardTagSelector from './StandardTagSelector.vue'
 import type { GenreModule } from '../../types/genreModule'
 import type { MaterialFilters } from '../../types/material'
+import { COMMON_UPLOAD_PLATFORMS } from '../../config/materials'
 
-const props = withDefaults(defineProps<{ modelValue: MaterialFilters; modules: GenreModule[]; hideGenre?: boolean }>(), { hideGenre: false })
+const props = withDefaults(defineProps<{ modelValue: MaterialFilters; modules: GenreModule[]; hideGenre?: boolean; libraryType?: 'material' | 'script' }>(), { hideGenre: false, libraryType: 'material' })
 const emit = defineEmits<{ apply: [filters: MaterialFilters]; reset: [] }>()
 const draft = reactive<MaterialFilters>({})
-const emptyFilters: MaterialFilters = { keyword: undefined, genre_module_id: undefined, material_type: undefined, file_extension: undefined, tags: undefined, source: undefined, uploaded_from: undefined, uploaded_to: undefined, sort: 'created_desc', page: 1, page_size: 20 }
+const emptyFilters: MaterialFilters = { keyword: undefined, genre_module_id: undefined, material_type: undefined, file_extension: undefined, tags: undefined, source: undefined, upload_platform: undefined, uploaded_from: undefined, uploaded_to: undefined, sort: 'created_desc', page: 1, page_size: 20 }
 watch(() => props.modelValue, (value) => Object.assign(draft, emptyFilters, value), { immediate: true, deep: true })
 
 const fileTypes = ['pdf', 'docx', 'xlsx', 'csv', 'txt', 'md', 'jpg', 'jpeg', 'png']
@@ -18,7 +19,7 @@ const filterTags = computed<string[]>({
 })
 const selectedTagCount = computed(() => filterTags.value.length)
 const taxonomyOpen = ref(true)
-function submit() { emit('apply', { ...draft, material_type: undefined, source: undefined, page: 1 }) }
+function submit() { emit('apply', { ...draft, material_type: undefined, source: undefined, upload_platform: props.libraryType === 'material' ? draft.upload_platform : undefined, page: 1 }) }
 function syncTaxonomyOpen(event: Event) { taxonomyOpen.value = (event.currentTarget as HTMLDetailsElement).open }
 </script>
 
@@ -31,6 +32,9 @@ function syncTaxonomyOpen(event: Event) { taxonomyOpen.value = (event.currentTar
       </el-select>
       <el-select v-model="draft.file_extension" clearable placeholder="文件类型">
         <el-option v-for="item in fileTypes" :key="item" :label="item.toUpperCase()" :value="item" />
+      </el-select>
+      <el-select v-if="libraryType === 'material'" v-model="draft.upload_platform" data-test="filter-platform" clearable filterable allow-create default-first-option placeholder="上传平台">
+        <el-option v-for="item in COMMON_UPLOAD_PLATFORMS" :key="item" :label="item" :value="item" />
       </el-select>
       <el-date-picker v-model="draft.uploaded_from" type="date" value-format="YYYY-MM-DD" placeholder="上传开始日期" />
       <el-date-picker v-model="draft.uploaded_to" type="date" value-format="YYYY-MM-DD" placeholder="上传结束日期" />

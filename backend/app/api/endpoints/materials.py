@@ -83,6 +83,8 @@ async def upload_materials(
     description: Annotated[str, Form(max_length=20_000)] = "",
     uploaded_by: Annotated[str, Form(max_length=100)] = "",
     project_owner: Annotated[str, Form(max_length=100)] = "",
+    upload_platform: Annotated[str | None, Form(max_length=60)] = None,
+    platform_heat: Annotated[float | None, Form(ge=0, le=100)] = None,
     session: Session = Depends(get_db),
 ) -> dict[str, Any]:
     data = await MaterialService(session).upload(
@@ -96,6 +98,8 @@ async def upload_materials(
         description=description,
         uploaded_by=uploaded_by,
         project_owner=project_owner,
+        upload_platform=upload_platform,
+        platform_heat=platform_heat,
     )
     return {"success": True, "data": data, "message": "素材文件处理完成", "error": None}
 
@@ -105,6 +109,7 @@ def list_materials(
     library_type: Literal["material", "script"] = Query(default="material"),
     keyword: str | None = Query(default=None, max_length=100),
     genre_module_id: UUID | None = None,
+    upload_platform: str | None = Query(default=None, max_length=60),
     material_type: str | None = Query(default=None, max_length=30),
     file_extension: str | None = Query(default=None, max_length=20),
     tags: list[str] = Query(default=[]),
@@ -123,6 +128,7 @@ def list_materials(
         library_type=library_type,
         keyword=keyword,
         genre_module_id=str(genre_module_id) if genre_module_id else None,
+        upload_platform=upload_platform,
         material_type=material_type,
         file_extension=file_extension,
         tags=_parse_values(tags),

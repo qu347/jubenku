@@ -40,6 +40,8 @@ class MaterialUpdate(BaseModel):
     description: str | None = Field(default=None, max_length=20_000)
     uploaded_by: str | None = Field(default=None, max_length=100)
     project_owner: str | None = Field(default=None, max_length=100)
+    upload_platform: str | None = Field(default=None, max_length=60)
+    platform_heat: float | None = Field(default=None, ge=0, le=100)
 
     model_config = ConfigDict(extra="forbid")
 
@@ -78,6 +80,8 @@ class MaterialRead(BaseModel):
     source: str
     uploaded_by: str
     project_owner: str
+    upload_platform: str | None
+    platform_heat: float | None
     content_text: str
     content_truncated: bool
     original_filename: str

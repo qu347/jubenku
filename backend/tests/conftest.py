@@ -1,7 +1,5 @@
 import os
 import sys
-import shutil
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -64,12 +62,10 @@ def db_session() -> Session:
 
 
 @pytest.fixture()
-def upload_storage_path() -> Path:
-    path = Path(tempfile.mkdtemp(prefix="script_materials_test_"))
-    try:
-        yield path
-    finally:
-        shutil.rmtree(path, ignore_errors=True)
+def upload_storage_path(tmp_path: Path) -> Path:
+    path = tmp_path / "materials"
+    path.mkdir()
+    return path
 
 
 @pytest.fixture()

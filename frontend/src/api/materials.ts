@@ -28,6 +28,8 @@ export function uploadMaterials(payload: MaterialUploadPayload, onProgress?: (pe
   form.append('description', payload.description)
   form.append('uploaded_by', payload.uploaded_by || '')
   form.append('project_owner', payload.project_owner || '')
+  if (payload.upload_platform !== undefined) form.append('upload_platform', payload.upload_platform)
+  if (payload.platform_heat !== undefined) form.append('platform_heat', String(payload.platform_heat))
   return request<MaterialUploadResult>({
     method: 'POST', url: '/materials/upload', data: form, timeout: 10 * 60 * 1000,
     onUploadProgress: (event) => {

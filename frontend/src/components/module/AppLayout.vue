@@ -37,7 +37,7 @@ function scriptModuleActive(slug: string) { return route.name === 'genre-scripts
           <span class="group-label">工作台</span>
           <RouterLink to="/materials" :class="{ active: route.path === '/materials' }"><el-icon><Files /></el-icon><span>素材库</span></RouterLink>
           <RouterLink to="/scripts" :class="{ active: route.path === '/scripts' }"><el-icon><Document /></el-icon><span>剧本库</span></RouterLink>
-          <RouterLink to="/genre-map" :class="{ active: route.path === '/genre-map' }"><el-icon><DataAnalysis /></el-icon><span>题材定位图</span></RouterLink>
+          <RouterLink to="/genre-map" :class="{ active: route.path === '/genre-map' }"><el-icon><DataAnalysis /></el-icon><span>平台热度趋势</span></RouterLink>
           <RouterLink to="/settings/modules" :class="{ active: route.path === '/settings/modules' }"><el-icon><Setting /></el-icon><span>题材配置</span></RouterLink>
         </div>
 
