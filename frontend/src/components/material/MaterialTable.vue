@@ -3,7 +3,7 @@ import { Delete, Download, EditPen, View } from '@element-plus/icons-vue'
 import type { Material } from '../../types/material'
 import { formatDateTime } from '../../utils/format'
 
-withDefaults(defineProps<{ items: Material[]; loading?: boolean; contentNoun?: string }>(), { contentNoun: '素材' })
+withDefaults(defineProps<{ items: Material[]; loading?: boolean; contentNoun?: string; libraryType?: 'material' | 'script' }>(), { contentNoun: '素材', libraryType: 'material' })
 const emit = defineEmits<{ view: [item: Material]; edit: [item: Material]; download: [item: Material]; delete: [item: Material] }>()
 
 function size(value: number) {
@@ -20,6 +20,7 @@ function size(value: number) {
     </el-table-column>
     <el-table-column label="题材" min-width="110"><template #default="scope">{{ scope.row.genre_module?.name || '—' }}</template></el-table-column>
     <el-table-column prop="material_type" :label="`${contentNoun}类型`" min-width="110" />
+    <el-table-column v-if="libraryType === 'material'" label="平台信息" min-width="170"><template #default="scope"><span class="platform-meta">{{ scope.row.upload_platform ? `${scope.row.upload_platform} · 热度 ${scope.row.platform_heat ?? '待补充'}` : '平台信息待补充' }}</span></template></el-table-column>
     <el-table-column label="文件" width="100"><template #default="scope"><span class="file-pill" :class="{ empty: !scope.row.has_attachment }">{{ scope.row.has_attachment ? scope.row.file_extension.toUpperCase() : '无附件' }}</span></template></el-table-column>
     <el-table-column label="大小" width="95"><template #default="scope">{{ scope.row.has_attachment ? size(scope.row.file_size) : '—' }}</template></el-table-column>
     <el-table-column label="标签" min-width="160"><template #default="scope"><div class="tags"><span v-for="tag in scope.row.tags" :key="tag">{{ tag }}</span><i v-if="!scope.row.tags.length">—</i></div></template></el-table-column>
@@ -32,5 +33,5 @@ function size(value: number) {
 </template>
 
 <style scoped>
-.material-table{--el-table-bg-color:var(--panel);--el-table-tr-bg-color:var(--panel);--el-table-row-hover-bg-color:var(--panel-hover);--el-table-header-bg-color:var(--panel-raised);--el-table-border-color:var(--border-soft);--el-table-text-color:var(--text-secondary);--el-table-header-text-color:var(--text-muted)}.title-cell{display:grid;gap:4px;padding:0;border:0;background:none;color:var(--text);text-align:left;cursor:pointer}.title-cell span{color:var(--text-muted);font-size:9px}.file-pill{padding:3px 6px;border-radius:4px;background:var(--accent-soft);color:var(--accent);font-size:9px;font-weight:800}.file-pill.empty{background:var(--panel-raised);color:var(--text-muted)}.tags{display:flex;flex-wrap:wrap;gap:4px}.tags span{padding:2px 6px;border:1px solid var(--border);border-radius:99px;color:var(--text-muted);font-size:8px}.tags i{color:var(--text-muted);font-style:normal}
+.material-table{--el-table-bg-color:var(--panel);--el-table-tr-bg-color:var(--panel);--el-table-row-hover-bg-color:var(--panel-hover);--el-table-header-bg-color:var(--panel-raised);--el-table-border-color:var(--border-soft);--el-table-text-color:var(--text-secondary);--el-table-header-text-color:var(--text-muted)}.title-cell{display:grid;gap:4px;padding:0;border:0;background:none;color:var(--text);text-align:left;cursor:pointer}.title-cell span{color:var(--text-muted);font-size:9px}.platform-meta{color:var(--text-muted);font-size:10px}.file-pill{padding:3px 6px;border-radius:4px;background:var(--accent-soft);color:var(--accent);font-size:9px;font-weight:800}.file-pill.empty{background:var(--panel-raised);color:var(--text-muted)}.tags{display:flex;flex-wrap:wrap;gap:4px}.tags span{padding:2px 6px;border:1px solid var(--border);border-radius:99px;color:var(--text-muted);font-size:8px}.tags i{color:var(--text-muted);font-style:normal}
 </style>

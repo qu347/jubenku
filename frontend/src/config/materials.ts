@@ -24,6 +24,11 @@ export const MATERIAL_TYPES = [
   { value: 'reference', label: '参考资料', icon: Brush, color: '#64748b' },
 ] as const
 
+export const COMMON_UPLOAD_PLATFORMS = [
+  '番茄小说', '七猫', '起点中文网', '晋江文学城', '纵横中文网',
+  '抖音', '快手', '小红书', '微信公众号', '知乎',
+] as const
+
 export const STATUS_LABELS: Record<string, string> = {
   draft: '草稿',
   improving: '完善中',

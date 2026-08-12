@@ -11,7 +11,7 @@ vi.mock('../api/materials', () => api)
 
 const material = {
   id: 'm1', genre_module_id: 'g1', genre_module: { id: 'g1', name: '悬疑' }, title: '线索表', material_type: '研究资料',
-  description: '', tags: ['线索'], source: '内部', original_filename: '线索表.xlsx', stored_filename: 'uuid.xlsx',
+  description: '', tags: ['线索'], source: '内部', upload_platform: '番茄小说', platform_heat: 88, original_filename: '线索表.xlsx', stored_filename: 'uuid.xlsx',
   storage_path: 'materials/2026/08/uuid.xlsx', file_extension: 'xlsx', mime_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   file_size: 1024, has_attachment: true, created_at: '2026-08-11T00:00:00Z', updated_at: '2026-08-11T00:00:00Z', deleted_at: null,
 }
@@ -31,7 +31,7 @@ describe('Sprint 3 素材 Store', () => {
   it('多文件上传完成后刷新素材列表', async () => {
     api.uploadMaterials.mockResolvedValue({ success_count: 2, failure_count: 0, results: [], materials: [material] })
     const store = useMaterialsStore()
-    await store.upload({ files: [new File(['a'], 'a.txt'), new File(['b'], 'b.md')], genre_module_id: 'g1', material_type: '研究资料', tags: [], source: '', description: '' })
+    await store.upload({ files: [new File(['a'], 'a.txt'), new File(['b'], 'b.md')], library_type: 'material', genre_module_id: 'g1', material_type: '研究资料', tags: [], source: '', description: '', upload_platform: '番茄小说', platform_heat: 88 })
     expect(api.uploadMaterials.mock.calls[0]?.[0].files).toHaveLength(2)
     expect(api.listMaterials).toHaveBeenCalledOnce()
   })
@@ -49,8 +49,9 @@ describe('素材上传抽屉', () => {
   const stubs = {
     'el-drawer': { template: '<div><slot/><slot name="footer"/></div>', props: ['modelValue'] },
     'el-form': { template: '<form><slot/></form>' }, 'el-form-item': { template: '<label><slot/></label>' },
-    'el-select': { template: '<select><slot/></select>' }, 'el-option': { template: '<option />' },
+    'el-select': { props: ['modelValue'], emits: ['update:modelValue'], template: '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><slot/></select>' }, 'el-option': { template: '<option />' },
     'el-input': { props: ['modelValue'], emits: ['update:modelValue'], template: '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />' }, 'el-progress': { template: '<div class="progress-stub" />' },
+    'el-input-number': { props: ['modelValue'], emits: ['update:modelValue'], template: '<input type="number" :value="modelValue" @input="$emit(\'update:modelValue\', Number($event.target.value))" />' },
   }
 
   it('选择多个文件后渲染待上传文件列表', async () => {
@@ -71,12 +72,36 @@ describe('素材上传抽屉', () => {
     await wrapper.get('[data-testid="story-summary-input"]').setValue('剧情摘要')
     await wrapper.get('[data-testid="uploaded-by-input"]').setValue('张三')
     await wrapper.get('[data-testid="project-owner-input"]').setValue('李制片')
+    await wrapper.get('[data-test="upload-platform"]').setValue('番茄小说')
+    await wrapper.get('[data-test="platform-heat"]').setValue(88)
     await wrapper.findAll('button').find((button) => button.text() === '逆袭')!.trigger('click')
     await wrapper.findAll('button').find((button) => button.text() === '现代')!.trigger('click')
     await wrapper.findAll('button').at(-1)?.trigger('click')
     await flushPromises()
     expect(wrapper.text()).toContain('不允许的扩展名')
     expect(api.listMaterials).toHaveBeenCalledOnce()
+  })
+
+  it('素材上传要求平台和热度，剧本上传不显示这些字段', async () => {
+    const common = { props: { modelValue: true, modules: [{ id: 'g1', name: '悬疑' }] as never }, global: { stubs } }
+    const wrapper = mount(MaterialUploadDrawer, common)
+    const input = wrapper.find('input[type="file"]')
+    Object.defineProperty(input.element, 'files', { value: [new File(['a'], '素材.txt')], configurable: true })
+    await input.trigger('change')
+    await wrapper.get('[data-testid="story-summary-input"]').setValue('剧情摘要')
+    await wrapper.get('[data-testid="uploaded-by-input"]').setValue('张三')
+    await wrapper.get('[data-testid="project-owner-input"]').setValue('李制片')
+    await wrapper.findAll('button').find((button) => button.text() === '逆袭')!.trigger('click')
+    await wrapper.findAll('button').find((button) => button.text() === '现代')!.trigger('click')
+
+    expect(wrapper.get('[data-test="upload-platform"]').attributes('allow-create')).toBeDefined()
+    await wrapper.get('[data-test="submit-upload"]').trigger('click')
+    expect(wrapper.text()).toContain('请选择或输入上传平台')
+    expect(wrapper.text()).toContain('请填写 0 到 100 的平台热度')
+
+    const scriptWrapper = mount(MaterialUploadDrawer, { ...common, props: { ...common.props, libraryType: 'script' } })
+    expect(scriptWrapper.find('[data-test="upload-platform"]').exists()).toBe(false)
+    expect(scriptWrapper.find('[data-test="platform-heat"]').exists()).toBe(false)
   })
 })
 
@@ -164,7 +189,7 @@ describe('旧素材详情兼容', () => {
           'el-form-item': { template: '<label><slot /></label>' },
           'el-input': { template: '<input />' },
           'el-select': { template: '<select><slot /></select>' },
-          'el-option': { template: '<option />' },
+          'el-option': { template: '<option />' }, 'el-input-number': true,
         },
       },
     })
@@ -190,7 +215,7 @@ describe('旧素材详情兼容', () => {
           'el-form-item': { template: '<label><slot /></label>' },
           'el-input': { template: '<input />' },
           'el-select': { template: '<select><slot /></select>' },
-          'el-option': { template: '<option />' },
+          'el-option': { template: '<option />' }, 'el-input-number': true,
         },
       },
     })
