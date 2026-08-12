@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Require upload platform and 0–100 platform heat for new material uploads, then replace the age/education map with a live ECharts ranking aggregated from material records.
+**Goal:** Require upload platform and 0–100 platform heat for new material uploads, then let users select a platform and compare each genre's monthly heat curve in ECharts.
 
 **Architecture:** Store platform metadata on each material and expose a new read-only `/api/genre-positioning` aggregation grouped by genre and normalized platform. The Vue page consumes only that aggregate endpoint; existing `genre_metrics` data and APIs remain untouched for database compatibility but disappear from the active UI.
 
@@ -16,7 +16,7 @@
 - Existing materials may retain null platform fields and remain readable; incomplete records do not contribute to aggregates.
 - Aggregate results are computed live from active materials; do not write aggregate copies to `genre_metrics`.
 - Keep the `genre_metrics` table and old API routes intact; do not expose their create/import/export UI on `/genre-map`.
-- The active chart must use ECharts horizontal bars, a fixed 0–100 value axis, `dataZoom` for long lists, and `richText` tooltip rendering.
+- The active chart must use ECharts smooth multi-line series: selected platform, one line per genre, UTC upload months on the x-axis, a fixed 0–100 heat axis, horizontal `dataZoom`, end labels, and `richText` tooltip rendering.
 - Do not add background jobs, threads, queues, web scraping, authentication, payments, or AI generation.
 - Every production change follows RED → GREEN → REFACTOR, and no task may modify the original retained database directly.
 
@@ -372,14 +372,108 @@ git commit -m "feat: collect material platform heat"
 
 ---
 
-### Task 4: Replace the audience map with an ECharts heat ranking
+### Task 4: Add selected-platform monthly genre timeline API
+
+**Files:**
+- Modify: `backend/app/schemas/genre_positioning.py`
+- Modify: `backend/app/repositories/genre_positioning_repository.py`
+- Modify: `backend/app/services/genre_positioning_service.py`
+- Modify: `backend/app/api/endpoints/genre_positioning.py`
+- Test: `backend/tests/test_material_positioning.py`
+
+**Interfaces:**
+- Produces `GET /api/genre-positioning/timeline?upload_platform=<platform>`.
+- Produces `GenrePositioningTimeline` with `upload_platform`, `periods`, `points`, and `total_materials`.
+- Each point contains `genre_module_id`, `genre_name`, `theme_color`, `period`, `average_heat`, and `material_count`.
+
+- [ ] **Step 1: Write failing monthly aggregation tests**
+
+Create active materials with explicit UTC `created_at` values across months, genres, and platforms. Assert exact platform matching, monthly grouping, average heat, counts, ascending `YYYY-MM` periods, inactive/deleted/incomplete/script exclusions, and no synthetic point for a missing month:
+
+```python
+def test_timeline_groups_selected_platform_by_genre_and_upload_month(client, create_material):
+    fantasy = create_material(platform="抖音", heat=80, created_at="2026-06-03T00:00:00Z")
+    create_material(genre=fantasy.genre_module, platform="抖音", heat=100, created_at="2026-06-20T00:00:00Z")
+    create_material(genre=fantasy.genre_module, platform="抖音", heat=70, created_at="2026-08-01T00:00:00Z")
+
+    response = client.get("/api/genre-positioning/timeline", params={"upload_platform": " 抖音 "})
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["periods"] == ["2026-06", "2026-08"]
+    assert [(p["period"], p["average_heat"], p["material_count"]) for p in data["points"]] == [
+        ("2026-06", 90.0, 2),
+        ("2026-08", 70.0, 1),
+    ]
+```
+
+Also assert omitted/blank platform returns 422 and custom platforms appear in existing `/api/genre-positioning` results used by the dropdown.
+
+- [ ] **Step 2: Run focused tests and verify RED**
+
+Run:
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m pytest tests/test_material_positioning.py -q --basetemp ../.runtime/pytest-timeline-red
+```
+
+Expected: timeline route returns 404.
+
+- [ ] **Step 3: Implement schemas and portable repository query**
+
+Define:
+
+```python
+class GenrePositioningTimelinePoint(BaseModel):
+    genre_module_id: str
+    genre_name: str
+    theme_color: str
+    period: str
+    average_heat: float
+    material_count: int
+
+
+class GenrePositioningTimeline(BaseModel):
+    upload_platform: str
+    periods: list[str]
+    points: list[GenrePositioningTimelinePoint]
+    total_materials: int
+```
+
+Repository `timeline(upload_platform: str) -> list[Material]` selects only valid material rows for an active genre and exact `lower(trim(upload_platform))` match. Use Python to group by `created_at.astimezone(timezone.utc).strftime("%Y-%m")` and genre so behavior is identical on SQLite and PostgreSQL; calculate rounded means and counts in the service. Return only observed months.
+
+- [ ] **Step 4: Add endpoint and response ordering**
+
+Register `/timeline` before `/{metric_id}`-style dynamic paths are relevant. Normalize the required query platform, reject blank input with code `platform_required`, order `periods` ascending, and order points by period then genre name and ID. Use the most recently updated matching material's trimmed platform spelling in `upload_platform`.
+
+- [ ] **Step 5: Run focused and full backend tests**
+
+Run:
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m pytest tests/test_material_positioning.py -q --basetemp ../.runtime/pytest-timeline-green
+.\.venv\Scripts\python.exe -m pytest -q --basetemp ../.runtime/pytest-timeline-all
+```
+
+Expected: all focused and all backend tests pass.
+
+- [ ] **Step 6: Commit Task 4**
+
+```powershell
+git add backend/app/schemas/genre_positioning.py backend/app/repositories/genre_positioning_repository.py backend/app/services/genre_positioning_service.py backend/app/api/endpoints/genre_positioning.py backend/tests/test_material_positioning.py
+git commit -m "feat: add platform genre heat timeline"
+```
+
+---
+
+### Task 5: Replace the audience map with an ECharts platform genre trend chart
 
 **Files:**
 - Create: `frontend/src/types/genrePositioning.ts`
 - Create: `frontend/src/api/genrePositioning.ts`
 - Create: `frontend/src/stores/genrePositioning.ts`
-- Create: `frontend/src/components/genre-map/GenreHeatRankingChart.vue`
-- Create: `frontend/src/components/genre-map/GenrePositioningFilterBar.vue`
+- Create: `frontend/src/components/genre-map/GenreHeatTrendChart.vue`
 - Create: `frontend/src/components/genre-map/GenrePositioningTable.vue`
 - Modify: `frontend/src/views/GenreMapView.vue`
 - Modify: `frontend/src/components/module/AppLayout.vue`
@@ -387,35 +481,35 @@ git commit -m "feat: collect material platform heat"
 - Test: `frontend/src/__tests__/sprint3.navigation.spec.ts`
 
 **Interfaces:**
-- Produces `GenrePositioningItem`, `GenrePositioningFilters`, and `GenrePositioningList` matching Task 2.
-- Produces `listGenrePositioning(filters)` and a Pinia store with `items`, `total`, `filters`, `loading`, `error`, `fetchPositioning`, `setFilters`.
-- Chart emits `select: [item: GenrePositioningItem]`.
+- Produces TypeScript types matching Task 4 timeline and Task 2 current aggregate responses.
+- Produces `listGenrePositioning()` for platform options and `getGenrePositioningTimeline(uploadPlatform)` for chart/table data.
+- Store exposes `platforms`, `selectedPlatform`, `timeline`, `loading`, `error`, `fetchPlatforms`, `selectPlatform`.
+- Chart emits `select: [point: GenrePositioningTimelinePoint]`.
 
-- [ ] **Step 1: Write failing page, store, and navigation tests**
+- [ ] **Step 1: Write failing page, API/store, chart option, and navigation tests**
 
-Test the active page contract rather than old component internals:
+Test the approved interaction:
 
 ```typescript
-it('shows only platform positioning controls and summaries', async () => {
-  const wrapper = mountGenreMap([{ genre_name: '西方奇幻', upload_platform: '番茄小说', average_heat: 85, material_count: 3 }])
-  expect(wrapper.text()).toContain('题材平台热度图')
-  expect(wrapper.text()).toContain('覆盖平台')
+it('selects one platform and draws one line per genre over upload months', async () => {
+  const wrapper = mountGenreMap(timelineFixture)
+  expect(wrapper.text()).toContain('题材平台热度趋势图')
+  expect(wrapper.text()).toContain('选择平台')
   expect(wrapper.text()).not.toContain('平均年龄')
-  expect(wrapper.text()).not.toContain('学历层级')
-  expect(wrapper.text()).not.toContain('导入数据')
   expect(wrapper.text()).not.toContain('新增数据')
+  expect(chartOption.series.map((series) => series.name)).toEqual(['西方奇幻', '悬疑灵异'])
 })
 
-it('opens the matching material list from a positioning row', async () => {
-  await wrapper.find('[data-test="view-materials"]').trigger('click')
+it('opens the selected platform and point genre in the material library', async () => {
+  chartEmit('select', timelineFixture.points[0])
   expect(router.currentRoute.value.query).toMatchObject({
     genre_module_id: 'genre-1',
-    upload_platform: '番茄小说',
+    upload_platform: '抖音',
   })
 })
 ```
 
-Add a store/API test for the four filters and a chart option test asserting ECharts `xAxis.max === 100`, horizontal `bar` series, `dataZoom`, item colors from `theme_color`, and rich-text tooltip.
+Assert platform options are derived from all current aggregate items and deduplicated case-insensitively, including a custom platform. Assert selecting a platform calls timeline with that exact selection.
 
 - [ ] **Step 2: Run focused tests and verify RED**
 
@@ -423,72 +517,45 @@ Run:
 
 ```powershell
 cd frontend
-pnpm run test:unit -- src/__tests__/genrePositioning.spec.ts src/__tests__/sprint3.navigation.spec.ts
+node D:\文档存储\frontend\node_modules\vitest\vitest.mjs run src/__tests__/genrePositioning.spec.ts src/__tests__/sprint3.navigation.spec.ts
 ```
 
-Expected: old age/education content remains and new aggregate API/components are missing.
+Expected: old age/education UI remains and timeline modules do not exist.
 
 - [ ] **Step 3: Implement types, API, and store**
 
-Use:
+Use the Task 4 response types. `fetchPlatforms()` calls `/genre-positioning`, derives unique trimmed platform names, sorts them with Chinese locale comparison, preserves a still-valid selection, otherwise selects the first platform, then loads its timeline. Empty platform results clear the timeline and show an upload guidance state. `selectPlatform()` loads only the chosen platform and ignores stale out-of-order responses with a monotonically increasing request token.
 
-```typescript
-export interface GenrePositioningItem {
-  genre_module_id: string
-  genre_name: string
-  theme_color: string
-  upload_platform: string
-  average_heat: number
-  material_count: number
-  latest_updated_at: string
-}
-```
+- [ ] **Step 4: Implement ECharts smooth multi-line option**
 
-`listGenrePositioning` calls `GET /genre-positioning`. The store replaces filters atomically, fetches once because aggregate groups are not paginated, preserves error text, and clears stale items on failed requests.
+Each genre becomes one `line` series with `smooth: true`, circle symbols, theme color, `connectNulls: false`, and `endLabel.formatter: '{a}'`. Build each series data array against the complete sorted `periods` list, using `null` for missing points. The y-axis is value `min: 0`, `max: 100`; the x-axis is category months. Add horizontal inside/slider `dataZoom` when more than 12 months. Tooltip must use `renderMode: 'richText'` and newline-separated plain text with selected platform, genre, month, average heat, and material count. Export a pure `buildGenreHeatTrendOption()` for deterministic tests.
 
-- [ ] **Step 4: Implement ECharts ranking and simplified controls**
+- [ ] **Step 5: Replace the active page and table**
 
-Build a horizontal bar option with category labels formatted as `题材 · 平台`, a value axis fixed at 0–100, descending heat order, item color from `theme_color`, and labels formatted as `85.0 · 3份`. Add inside/slider `dataZoom` when more than 12 rows. Tooltip must use `renderMode: 'richText'` and return newline-separated plain text containing genre, platform, average heat, material count, and latest update only.
+Remove old metric CRUD/import/export/editor/detail components from `GenreMapView.vue`. Place a searchable platform `el-select` beside the chart/table switch. The table columns are topic, platform, upload month, average heat, material count, and view material. Summaries show selected platform, unique genre count, observed month count, and material-weighted platform heat. Preserve local chart/table view preference and route `/genre-map`; navigation label becomes “平台热度趋势”. Clicking a point or table action navigates with topic and platform query filters.
 
-Build filters for genre, creatable platform, and min/max heat. Build the six-column table from the approved design. Both chart click and table action navigate to `/materials?genre_module_id=<id>&upload_platform=<platform>`.
+- [ ] **Step 6: Run focused tests and type checking**
 
-- [ ] **Step 5: Replace the active page**
-
-Remove old metric editor/import/detail actions and imports from `GenreMapView.vue`. Summaries become group count, unique genre count, unique platform count, and material-weighted overall heat:
-
-```typescript
-const overallHeat = computed(() => {
-  const count = store.items.reduce((sum, item) => sum + item.material_count, 0)
-  return count
-    ? store.items.reduce((sum, item) => sum + item.average_heat * item.material_count, 0) / count
-    : 0
-})
-```
-
-Keep chart/table preference in local storage. Update left navigation copy from “题材定位图” to “平台热度图” while retaining route `/genre-map`.
-
-- [ ] **Step 6: Run focused tests and verify GREEN**
-
-Run:
+Run separately:
 
 ```powershell
 cd frontend
-pnpm run test:unit -- src/__tests__/genrePositioning.spec.ts src/__tests__/sprint3.navigation.spec.ts
-pnpm run type-check
+node D:\文档存储\frontend\node_modules\vitest\vitest.mjs run src/__tests__/genrePositioning.spec.ts src/__tests__/sprint3.navigation.spec.ts
+node D:\文档存储\frontend\node_modules\vue-tsc\bin\vue-tsc.js -b
 ```
 
-Expected: page, chart option, filters, navigation, and TypeScript checks pass.
+Expected: focused tests and type checking pass without watch mode.
 
-- [ ] **Step 7: Commit Task 4**
+- [ ] **Step 7: Commit Task 5**
 
 ```powershell
-git add frontend/src/types/genrePositioning.ts frontend/src/api/genrePositioning.ts frontend/src/stores/genrePositioning.ts frontend/src/components/genre-map/GenreHeatRankingChart.vue frontend/src/components/genre-map/GenrePositioningFilterBar.vue frontend/src/components/genre-map/GenrePositioningTable.vue frontend/src/views/GenreMapView.vue frontend/src/components/module/AppLayout.vue frontend/src/__tests__/genrePositioning.spec.ts frontend/src/__tests__/sprint3.navigation.spec.ts
-git commit -m "feat: show live platform heat positioning"
+git add frontend/src/types/genrePositioning.ts frontend/src/api/genrePositioning.ts frontend/src/stores/genrePositioning.ts frontend/src/components/genre-map/GenreHeatTrendChart.vue frontend/src/components/genre-map/GenrePositioningTable.vue frontend/src/views/GenreMapView.vue frontend/src/components/module/AppLayout.vue frontend/src/__tests__/genrePositioning.spec.ts frontend/src/__tests__/sprint3.navigation.spec.ts
+git commit -m "feat: show platform genre heat trends"
 ```
 
 ---
 
-### Task 5: Documentation, regression, migration, and runtime acceptance
+### Task 6: Documentation, regression, migration, and runtime acceptance
 
 **Files:**
 - Modify: `README.md`
@@ -502,12 +569,12 @@ git commit -m "feat: show live platform heat positioning"
 - Test: `frontend/src/__tests__/genrePositioning.spec.ts`
 
 **Interfaces:**
-- Documents the final upload fields, live aggregation rules, old-data behavior, and `/api/genre-positioning` endpoint.
+- Documents the final upload fields, current and monthly aggregation rules, old-data behavior, and both `/api/genre-positioning` endpoints.
 - Produces a rebuilt `frontend/dist` consumed by production static hosting.
 
 - [ ] **Step 1: Update product and user documentation**
 
-Replace active age/education positioning instructions with the approved platform heat workflow. Explicitly state that old `genre_metrics` data is retained but not used by the page, historical materials must be supplemented before appearing, and scripts never enter positioning aggregation. Update release and restore checks to verify platform metadata and aggregate counts rather than age/education bubbles.
+Replace active age/education positioning instructions with the approved platform-selected monthly genre curve workflow. Explicitly state that old `genre_metrics` data is retained but not used by the page, historical materials must be supplemented before appearing, scripts never enter positioning aggregation, months come from UTC upload time, and missing months remain gaps. Update release and restore checks accordingly.
 
 - [ ] **Step 2: Run the full backend suite sequentially**
 
@@ -551,13 +618,14 @@ Restart the existing single-worker service only after confirming the listener PI
 
 1. material upload cannot submit without platform and heat;
 2. a custom platform with heat 85 uploads successfully;
-3. the ECharts ranking shows the matching genre/platform and count;
-4. clicking the bar opens the filtered material list;
-5. editing heat changes the aggregate;
-6. deleting the temporary material removes its aggregate group when it was the last member;
-7. no QA material or upload file remains after acceptance.
+3. the custom platform appears in the dropdown and can be selected;
+4. the ECharts line chart shows one genre curve with the correct month, heat, and count;
+5. clicking the curve point opens the filtered material list;
+6. editing heat changes the monthly point;
+7. deleting the temporary material removes its point when it was the last member;
+8. no QA material or upload file remains after acceptance.
 
-- [ ] **Step 6: Commit Task 5**
+- [ ] **Step 6: Commit Task 6**
 
 ```powershell
 git add README.md docs/PRODUCT_SPEC.md docs/USER_GUIDE.md docs/SPRINT_3.md docs/SPRINT_4.md docs/RELEASE_CHECKLIST.md docs/BACKUP_RESTORE.md frontend/dist
