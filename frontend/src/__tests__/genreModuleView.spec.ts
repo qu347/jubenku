@@ -122,6 +122,7 @@ describe('题材详情页', () => {
     expect(wrapper.text()).toContain('时间')
     expect(wrapper.text()).toContain('灰塔守钟人')
     expect(wrapper.text()).toContain('魔法史研究')
+    expect(wrapper.get('.story-table caption').text()).toBe('西方奇幻剧情列表')
     expect(wrapper.find('.section-tabs').exists()).toBe(false)
   })
 

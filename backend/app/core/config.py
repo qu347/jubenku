@@ -4,6 +4,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlparse
 
 from pydantic import Field, model_validator
 from pydantic_settings import (
@@ -15,6 +16,7 @@ from pydantic_settings import (
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
+LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 
 class Settings(BaseSettings):
@@ -84,14 +86,25 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def derive_compatible_paths(self) -> "Settings":
-        if self.is_production:
+        if self.is_production or "material_storage_path" not in self.model_fields_set:
             # Production attachment files have one fixed containment root.
             # Ignore the deprecated override even if it leaks in from a
-            # parent shell or an older environment file.
+            # parent shell or an older environment file. Other environments
+            # derive the same path unless it was explicitly configured.
             self.material_storage_path = self.storage_root / "materials"
-        elif "material_storage_path" not in self.model_fields_set:
-            self.material_storage_path = self.storage_root / "materials"
+        if self.is_production:
+            self._validate_production_cors_origins()
         return self
+
+    def _validate_production_cors_origins(self) -> None:
+        for origin in self.cors_origin_list:
+            parsed = urlparse(origin)
+            is_secure = parsed.scheme == "https" and parsed.hostname is not None
+            is_loopback = parsed.scheme == "http" and parsed.hostname in LOOPBACK_HOSTS
+            if origin == "*" or not (is_secure or is_loopback):
+                raise ValueError(
+                    "生产环境 CORS 来源必须使用 HTTPS；仅 localhost、127.0.0.1 和 ::1 可使用 HTTP"
+                )
 
     @property
     def is_production(self) -> bool:

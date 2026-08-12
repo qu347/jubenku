@@ -19,6 +19,7 @@ const emit = defineEmits<{
 <template>
   <div class="table-wrap surface">
     <table>
+      <caption class="sr-only">素材列表</caption>
       <thead><tr><th>素材</th><th>题材 / 标签</th><th>状态</th><th>所属项目</th><th>使用</th><th>最后修改</th><th></th></tr></thead>
       <tbody>
         <tr v-for="material in materials" :key="material.id" @click="emit('open', material)">
@@ -40,4 +41,3 @@ const emit = defineEmits<{
 .material-cell { min-width: 280px; display: flex; align-items: center; gap: 10px; }.type-icon { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 7px; background: var(--panel-hover); }.material-cell strong { display: block; color: var(--text); font-size: 13px; }.material-cell small { display: block; max-width: 300px; margin-top: 4px; overflow: hidden; color: var(--text-muted); text-overflow: ellipsis; white-space: nowrap; }
 .tags { display: flex; gap: 5px; }.tags span { padding: 3px 6px; border-radius: 4px; background: var(--panel-hover); color: var(--text-secondary); font-size: 9px; }.status { display: inline-flex; align-items: center; gap: 6px; }.status i { width: 5px; height: 5px; border-radius: 50%; background: #f59e0b; }.status i.completed { background: #34d399; }.status i.improving { background: #60a5fa; }.status i.archived { background: #94a3b8; }.row-actions { display: flex; }.row-actions button { width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted); cursor: pointer; }.row-actions button:hover { background: var(--panel-hover); color: var(--text); }.row-actions button.active { color: var(--accent); }
 </style>
-

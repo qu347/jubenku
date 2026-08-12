@@ -303,7 +303,7 @@ class GenreMetricService:
 
     @staticmethod
     def _validation_reason(error: dict[str, Any]) -> str:
-        error_type = error.get("type", "")
+        error_type = str(error.get("type") or "")
         if error_type == "missing":
             return "不能为空"
         if error_type in {"float_parsing", "float_type"}:
@@ -316,7 +316,7 @@ class GenreMetricService:
             return "数值超出允许范围"
         if error_type == "literal_error":
             return "值不在允许范围内"
-        message = str(error.get("msg", "输入值不合法"))
+        message = str(error.get("msg") or "输入值不合法")
         if "数据周期" in message:
             return "数据周期格式应为 YYYY-MM 或 YYYY-Q1"
         return "输入值不合法"
