@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 setlocal EnableExtensions
 chcp 65001 >nul
 
@@ -104,7 +104,11 @@ for %%V in (SETTINGS_ENV_FILE APP_ENV APP_HOST APP_PORT API_PREFIX DEBUG DATABAS
 set "APP_ENV=production"
 set "APP_HOST=127.0.0.1"
 set "APP_PORT="
-for /f "usebackq delims=" %%P in (`"%PYTHON_EXE%" "%BACKEND_DIR%\app\tools\select_port.py"`) do set "APP_PORT=%%P"
+set "PORT_FILE=%DATA_ROOT%\temp\selected_port.txt"
+if exist "%PORT_FILE%" del /q "%PORT_FILE%" >nul 2>&1
+"%PYTHON_EXE%" "%BACKEND_DIR%\app\tools\select_port.py" > "%PORT_FILE%"
+if not errorlevel 1 if exist "%PORT_FILE%" set /p APP_PORT=<"%PORT_FILE%"
+if exist "%PORT_FILE%" del /q "%PORT_FILE%" >nul 2>&1
 if not defined APP_PORT (
   echo [错误] 8000 至 8020 端口均不可用，请关闭占用程序后重试。
   pause

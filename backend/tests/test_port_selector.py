@@ -38,7 +38,14 @@ def test_launchers_use_the_selected_port() -> None:
     project_root = Path(__file__).resolve().parents[2]
 
     for launcher_name in ("start.bat", "启动项目.bat"):
-        launcher = (project_root / launcher_name).read_text(encoding="utf-8")
+        launcher_path = project_root / launcher_name
+        launcher_bytes = launcher_path.read_bytes()
+        assert not launcher_bytes.startswith(b"\xef\xbb\xbf")
+        assert b"\r\n" in launcher_bytes
+        launcher = launcher_bytes.decode("utf-8")
         assert "select_port.py" in launcher
+        assert "selected_port.txt" in launcher
+        assert "set /p APP_PORT=" in launcher
+        assert "for /f" not in launcher.lower()
         assert "--port %APP_PORT%" in launcher
         assert "127.0.0.1:%APP_PORT%/materials" in launcher
