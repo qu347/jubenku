@@ -373,3 +373,13 @@ def test_positioning_lists_custom_platform_for_platform_dropdown(client, create_
 
     assert response.status_code == 200
     assert response.json()["data"]["items"][0]["upload_platform"] == "自定义站点"
+
+
+def test_timeline_matches_case_variants_of_non_ascii_platform_names(client, create_material) -> None:
+    material = create_material(platform="Straße", heat=88, created_at="2026-06-03T00:00:00Z")
+
+    response = client.get("/api/genre-positioning/timeline", params={"upload_platform": "straße"})
+
+    assert response.status_code == 200
+    assert response.json()["data"]["total_materials"] == 1
+    assert response.json()["data"]["points"][0]["genre_module_id"] == material.genre_module.id

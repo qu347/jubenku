@@ -72,7 +72,7 @@ class GenrePositioningRepository:
         if genre_module_id:
             aggregate = aggregate.where(Material.genre_module_id == genre_module_id)
         if upload_platform:
-            aggregate = aggregate.where(normalized_platform == upload_platform.strip().casefold())
+            aggregate = aggregate.where(normalized_platform == upload_platform.strip().lower())
         if heat_min is not None:
             aggregate = aggregate.having(func.avg(Material.platform_heat) >= heat_min)
         if heat_max is not None:
@@ -119,7 +119,7 @@ class GenrePositioningRepository:
                 Material.platform_heat.is_not(None),
                 GenreModule.deleted_at.is_(None),
                 GenreModule.status == "active",
-                normalized_platform == upload_platform.strip().casefold(),
+                normalized_platform == upload_platform.strip().lower(),
             )
         )
         return list(self.session.scalars(statement))
