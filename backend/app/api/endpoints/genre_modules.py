@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.schemas.common import ApiResponse
 from app.schemas.genre import (
+    GenreLibraryType,
     GenreModuleCreate,
     GenreModuleDetail,
     GenreModuleRead,
@@ -28,6 +29,7 @@ def list_genre_modules(
     include_deleted: bool = Query(default=False),
     status_filter: str | None = Query(default=None, alias="status", pattern=r"^(active|inactive|disabled|archived)$"),
     keyword: str | None = Query(default=None, min_length=1, max_length=100),
+    library_type: GenreLibraryType | None = Query(default=None),
     session: Session = Depends(get_db),
 ) -> dict[str, Any]:
     data = GenreService(session).list_modules(
@@ -36,6 +38,7 @@ def list_genre_modules(
         include_deleted=include_deleted,
         module_status=status_filter,
         keyword=keyword,
+        library_type=library_type,
     )
     return {"success": True, "data": data, "message": "题材模块列表获取成功"}
 
@@ -52,8 +55,12 @@ def create_genre_module(payload: GenreModuleCreate, session: Session = Depends(g
 
 # Fixed paths must be declared before /{module_id} UUID paths.
 @router.patch("/genre-modules/batch/reorder", response_model=ApiResponse[list[GenreModuleRead]])
-def reorder_genre_modules(payload: ReorderPayload, session: Session = Depends(get_db)) -> dict[str, Any]:
-    data = GenreService(session).reorder_modules(payload)
+def reorder_genre_modules(
+    payload: ReorderPayload,
+    library_type: GenreLibraryType | None = Query(default=None),
+    session: Session = Depends(get_db),
+) -> dict[str, Any]:
+    data = GenreService(session).reorder_modules(payload, library_type)
     return {"success": True, "data": data, "message": "题材模块排序已保存"}
 
 
@@ -86,7 +93,7 @@ def update_genre_module(
 @router.delete("/genre-modules/{module_id}", response_model=ApiResponse[dict[str, str]])
 def delete_genre_module(module_id: UUID, session: Session = Depends(get_db)) -> dict[str, Any]:
     data = GenreService(session).delete_module(str(module_id))
-    return {"success": True, "data": data, "message": "题材模块已软删除"}
+    return {"success": True, "data": data, "message": "题材模块已永久删除"}
 
 
 @router.post("/genre-modules/{module_id}/duplicate", response_model=ApiResponse[GenreModuleRead])

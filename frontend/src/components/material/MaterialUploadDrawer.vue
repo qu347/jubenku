@@ -13,7 +13,8 @@ const props = withDefaults(defineProps<{
   modules: GenreModule[]
   initialGenreId?: string
   initialMaterialType?: string
-}>(), { initialGenreId: '', initialMaterialType: '' })
+  libraryType?: 'material' | 'script'
+}>(), { initialGenreId: '', initialMaterialType: '', libraryType: 'material' })
 const emit = defineEmits<{ complete: [] }>()
 const store = useMaterialsStore()
 const input = ref<HTMLInputElement>()
@@ -29,6 +30,7 @@ const progress = ref(0)
 const results = ref<MaterialUploadFileResult[]>([])
 const totalSize = computed(() => files.value.reduce((sum, file) => sum + file.size, 0))
 const singleFile = computed(() => files.value.length === 1)
+const contentNoun = computed(() => props.libraryType === 'script' ? '剧本' : '素材')
 
 watch([open, () => props.initialGenreId], ([value]) => {
   if (!value) return
@@ -66,6 +68,7 @@ async function submit() {
   try {
     const result = await store.upload({
       files: files.value,
+      library_type: props.libraryType,
       genre_module_id: genreId.value,
       material_type: '剧情',
       title: singleFile.value ? title.value.trim() : '',
@@ -77,7 +80,7 @@ async function submit() {
     }, (value) => progress.value = value)
     results.value = result.results
     if (result.failure_count) ElMessage.warning(`成功 ${result.success_count} 个，失败 ${result.failure_count} 个，请查看逐文件结果`)
-    else ElMessage.success(`已上传 ${result.success_count} 个剧情文件`)
+    else ElMessage.success(`已上传 ${result.success_count} 个${contentNoun.value}文件`)
     if (result.success_count) {
       files.value = []; title.value = ''; summary.value = ''; tags.value = []
       emit('complete')
@@ -87,9 +90,9 @@ async function submit() {
 </script>
 
 <template>
-  <el-drawer v-model="open" title="添加剧情素材" size="680px" :close-on-click-modal="!uploading">
+  <el-drawer v-model="open" :title="libraryType === 'script' ? '添加剧本' : '添加剧情素材'" size="680px" :close-on-click-modal="!uploading">
     <div class="drawer-body">
-      <div class="upload-lead"><el-icon><DocumentAdd /></el-icon><div><b>上传文件并建立剧情条目</b><span>上传后会直接出现在当前题材的“标题”列表中，点击标题即可阅读正文。</span></div></div>
+      <div class="upload-lead"><el-icon><DocumentAdd /></el-icon><div><b>{{ libraryType === 'script' ? '上传剧本并建立剧本条目' : '上传文件并建立剧情素材条目' }}</b><span>{{ libraryType === 'script' ? '剧本库用于保存编辑观看素材后完成的剧本，上传后可直接阅读正文。' : '素材上传后可供剧本编辑查阅，并会出现在所属题材的标题列表中。' }}</span></div></div>
       <button class="drop-zone" type="button" @click="input?.click()" @dragover.prevent @drop.prevent="onDrop">
         <el-icon><UploadFilled /></el-icon><b>拖拽文件到此处，或点击选择</b><span>推荐 MD / TXT / DOCX，可直接阅读剧情正文；其他格式可下载查看</span>
       </button>
@@ -103,12 +106,12 @@ async function submit() {
       <el-form label-position="top" class="metadata-form">
         <div class="form-grid">
           <el-form-item label="题材" required><el-select v-model="genreId" filterable class="full"><el-option v-for="item in modules" :key="item.id" :label="item.name" :value="item.id" /></el-select></el-form-item>
-          <el-form-item label="素材类型"><el-input model-value="剧情" disabled /></el-form-item>
+          <el-form-item :label="libraryType === 'script' ? '剧本类型' : '素材类型'"><el-input model-value="剧情" disabled /></el-form-item>
         </div>
         <el-form-item label="标题" :required="singleFile"><el-input v-model="title" data-testid="story-title-input" :disabled="!singleFile" maxlength="100" show-word-limit :placeholder="singleFile ? '输入列表中显示的标题' : '批量上传时自动使用文件名作为标题'" /></el-form-item>
         <el-form-item label="摘要" required><el-input v-model="summary" data-testid="story-summary-input" type="textarea" :rows="3" maxlength="20000" show-word-limit placeholder="用一两句话概括剧情钩子、冲突和看点" /></el-form-item>
         <div class="form-grid"><el-form-item label="上传人" required><el-input v-model="uploadedBy" data-testid="uploaded-by-input" maxlength="100" placeholder="例如：张三" /></el-form-item><el-form-item label="对接项目负责人" required><el-input v-model="projectOwner" data-testid="project-owner-input" maxlength="100" placeholder="例如：李制片" /></el-form-item></div>
-        <div class="taxonomy-field"><div class="taxonomy-title"><b>标准素材标签</b><span>剧情和角色可多选，时代背景为单选；可补充自定义标签</span></div><StandardTagSelector v-model="tags" /></div>
+        <div class="taxonomy-field"><div class="taxonomy-title"><b>标准剧情标签</b><span>剧情和角色可多选，时代背景为单选；可补充自定义标签</span></div><StandardTagSelector v-model="tags" /></div>
       </el-form>
 
       <div v-if="uploading || progress" class="progress"><span><b>上传进度</b><em>{{ progress }}%</em></span><el-progress :percentage="progress" :stroke-width="7" :show-text="false" /></div>

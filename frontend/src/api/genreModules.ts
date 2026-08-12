@@ -1,5 +1,5 @@
 import { request } from './http'
-import type { GenreModule, GenreModuleDetail, GenreModulePayload, GenreModuleQuery } from '../types/genreModule'
+import type { GenreLibraryType, GenreModule, GenreModuleDetail, GenreModulePayload, GenreModuleQuery } from '../types/genreModule'
 import type { ModuleSection, ModuleSectionPayload, ReorderItem } from '../types/moduleSection'
 
 export const listGenreModules = (params: GenreModuleQuery = {}) =>
@@ -33,8 +33,8 @@ export const enableGenreModule = (id: string) =>
 export const disableGenreModule = (id: string) =>
   request<GenreModule>({ method: 'POST', url: `/genre-modules/${id}/disable` })
 
-export const reorderGenreModules = (items: ReorderItem[]) =>
-  request<GenreModule[]>({ method: 'PATCH', url: '/genre-modules/batch/reorder', data: { items } })
+export const reorderGenreModules = (items: ReorderItem[], libraryType?: GenreLibraryType) =>
+  request<GenreModule[]>({ method: 'PATCH', url: '/genre-modules/batch/reorder', params: { library_type: libraryType }, data: { items } })
 
 export const listModuleSections = (moduleId: string, includeDisabled = false) =>
   request<ModuleSection[]>({

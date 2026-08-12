@@ -1,6 +1,6 @@
 import json
 from datetime import date
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
@@ -74,6 +74,7 @@ def _parse_values(values: list[str]) -> list[str]:
 @router.post("/upload", response_model=ApiResponse[MaterialUploadResult])
 async def upload_materials(
     files: Annotated[list[UploadFile], File(min_length=1)],
+    library_type: Annotated[Literal["material", "script"], Form()] = "material",
     genre_module_id: Annotated[UUID | None, Form()] = None,
     material_type: Annotated[str, Form(min_length=1, max_length=30)] = "参考资料",
     title: Annotated[str, Form(max_length=100)] = "",
@@ -86,6 +87,7 @@ async def upload_materials(
 ) -> dict[str, Any]:
     data = await MaterialService(session).upload(
         files=files,
+        library_type=library_type,
         genre_module_id=str(genre_module_id) if genre_module_id else None,
         material_type=material_type,
         title=title,
@@ -100,6 +102,7 @@ async def upload_materials(
 
 @router.get("", response_model=ApiResponse[MaterialPage])
 def list_materials(
+    library_type: Literal["material", "script"] = Query(default="material"),
     keyword: str | None = Query(default=None, max_length=100),
     genre_module_id: UUID | None = None,
     material_type: str | None = Query(default=None, max_length=30),
@@ -117,6 +120,7 @@ def list_materials(
     session: Session = Depends(get_db),
 ) -> dict[str, Any]:
     data = MaterialService(session).list(
+        library_type=library_type,
         keyword=keyword,
         genre_module_id=str(genre_module_id) if genre_module_id else None,
         material_type=material_type,

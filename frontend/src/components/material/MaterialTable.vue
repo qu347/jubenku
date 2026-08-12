@@ -3,7 +3,7 @@ import { Delete, Download, EditPen, View } from '@element-plus/icons-vue'
 import type { Material } from '../../types/material'
 import { formatDateTime } from '../../utils/format'
 
-defineProps<{ items: Material[]; loading?: boolean }>()
+withDefaults(defineProps<{ items: Material[]; loading?: boolean; contentNoun?: string }>(), { contentNoun: '素材' })
 const emit = defineEmits<{ view: [item: Material]; edit: [item: Material]; download: [item: Material]; delete: [item: Material] }>()
 
 function size(value: number) {
@@ -19,7 +19,7 @@ function size(value: number) {
       <template #default="scope"><button class="title-cell" @click="emit('view', scope.row)"><b>{{ scope.row.title }}</b><span>{{ scope.row.has_attachment ? scope.row.original_filename : '旧素材记录 · 无附件' }}</span></button></template>
     </el-table-column>
     <el-table-column label="题材" min-width="110"><template #default="scope">{{ scope.row.genre_module?.name || '—' }}</template></el-table-column>
-    <el-table-column prop="material_type" label="素材类型" min-width="110" />
+    <el-table-column prop="material_type" :label="`${contentNoun}类型`" min-width="110" />
     <el-table-column label="文件" width="100"><template #default="scope"><span class="file-pill" :class="{ empty: !scope.row.has_attachment }">{{ scope.row.has_attachment ? scope.row.file_extension.toUpperCase() : '无附件' }}</span></template></el-table-column>
     <el-table-column label="大小" width="95"><template #default="scope">{{ scope.row.has_attachment ? size(scope.row.file_size) : '—' }}</template></el-table-column>
     <el-table-column label="标签" min-width="160"><template #default="scope"><div class="tags"><span v-for="tag in scope.row.tags" :key="tag">{{ tag }}</span><i v-if="!scope.row.tags.length">—</i></div></template></el-table-column>

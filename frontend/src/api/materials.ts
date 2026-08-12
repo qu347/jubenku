@@ -19,6 +19,7 @@ export const deleteMaterial = (id: string) =>
 export function uploadMaterials(payload: MaterialUploadPayload, onProgress?: (percent: number) => void) {
   const form = new FormData()
   payload.files.forEach((file) => form.append('files', file))
+  form.append('library_type', payload.library_type || 'material')
   form.append('genre_module_id', payload.genre_module_id)
   form.append('material_type', payload.material_type)
   form.append('title', payload.title || '')

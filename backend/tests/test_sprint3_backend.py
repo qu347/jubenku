@@ -144,6 +144,37 @@ def test_story_metadata_and_text_content_are_returned(client: TestClient, db_ses
     assert updated.json()["data"]["project_owner"] == "赵导演"
 
 
+def test_material_and_script_libraries_are_isolated(client: TestClient, db_session: Session) -> None:
+    module = create_module(db_session)
+    material_response = upload(
+        client,
+        module,
+        [("reference.md", "# 素材\n冲突参考".encode("utf-8"), "text/markdown")],
+        title="冲突参考",
+        library_type="material",
+    )
+    script_response = upload(
+        client,
+        module,
+        [("episode-01.md", "# 第一集\n正式剧本".encode("utf-8"), "text/markdown")],
+        title="第一集剧本",
+        library_type="script",
+    )
+
+    assert material_response.status_code == 200
+    assert script_response.status_code == 200
+    assert material_response.json()["data"]["materials"][0]["library_type"] == "material"
+    assert script_response.json()["data"]["materials"][0]["library_type"] == "script"
+
+    materials = client.get("/api/materials", params={"library_type": "material"}).json()["data"]
+    scripts = client.get("/api/materials", params={"library_type": "script"}).json()["data"]
+    assert [item["title"] for item in materials["items"]] == ["冲突参考"]
+    assert [item["title"] for item in scripts["items"]] == ["第一集剧本"]
+
+    invalid = client.get("/api/materials", params={"library_type": "unknown"})
+    assert invalid.status_code == 422
+
+
 def test_partial_upload_failure_and_no_residue(client: TestClient, db_session: Session) -> None:
     module = create_module(db_session)
     response = upload(

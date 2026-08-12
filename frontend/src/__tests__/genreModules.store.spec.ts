@@ -29,10 +29,15 @@ describe('GenreModule Store', () => {
   })
 
   it('能成功读取题材导航列表', async () => {
-    apiMocks.listGenreModules.mockResolvedValue([sampleModule])
+    apiMocks.listGenreModules
+      .mockResolvedValueOnce([sampleModule])
+      .mockResolvedValueOnce([{ ...sampleModule, id: '2', name: '都市日常', slug: 'urban-daily' }])
     const store = useGenreModulesStore()
     await store.fetchNavigationModules()
-    expect(store.modules).toEqual([sampleModule])
+    expect(apiMocks.listGenreModules).toHaveBeenNthCalledWith(1, { library_type: 'material' })
+    expect(apiMocks.listGenreModules).toHaveBeenNthCalledWith(2, { library_type: 'script' })
+    expect(store.materialModules).toEqual([sampleModule])
+    expect(store.scriptModules[0]?.slug).toBe('urban-daily')
     expect(store.error).toBeNull()
     expect(store.loading).toBe(false)
   })
@@ -41,7 +46,8 @@ describe('GenreModule Store', () => {
     apiMocks.listGenreModules.mockRejectedValue(new Error('服务不可用'))
     const store = useGenreModulesStore()
     await store.fetchNavigationModules()
-    expect(store.modules).toEqual([])
+    expect(store.materialModules).toEqual([])
+    expect(store.scriptModules).toEqual([])
     expect(store.error).toBe('服务不可用')
   })
 
@@ -49,10 +55,11 @@ describe('GenreModule Store', () => {
     apiMocks.disableGenreModule.mockResolvedValue({ ...sampleModule, status: 'inactive' })
     apiMocks.listGenreModules
       .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ ...sampleModule, status: 'inactive' }])
     const store = useGenreModulesStore()
     await store.disableModule(sampleModule.id)
     expect(apiMocks.disableGenreModule).toHaveBeenCalledWith(sampleModule.id)
-    expect(store.modules).toEqual([])
+    expect(store.materialModules).toEqual([])
   })
 })

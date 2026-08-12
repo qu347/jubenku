@@ -22,9 +22,11 @@ function createTestRouter() {
     history: createMemoryHistory(),
     routes: [
       { path: '/', component: { template: '<div />' } },
-      { path: '/genres/:slug', name: 'genre-module', component: { template: '<div />' } },
+      { path: '/genres/:slug', name: 'genre-materials', component: { template: '<div />' } },
+      { path: '/script-genres/:slug', name: 'genre-scripts', component: { template: '<div />' } },
       { path: '/settings/modules', component: { template: '<div />' } },
       { path: '/materials', component: { template: '<div />' } },
+      { path: '/scripts', component: { template: '<div />' } },
       { path: '/genre-map', component: { template: '<div />' } },
     ],
   })
@@ -34,24 +36,35 @@ describe('动态题材导航', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
-    apiMocks.listGenreModules.mockResolvedValue([moduleItem])
+    apiMocks.listGenreModules
+      .mockResolvedValueOnce([moduleItem])
+      .mockResolvedValueOnce([{ ...moduleItem, id: '2', name: '都市日常', slug: 'urban-daily' }])
   })
 
   it('根据真实接口结果渲染题材菜单', async () => {
     const router = createTestRouter()
     await router.push('/')
     await router.isReady()
-    const wrapper = mount(AppLayout, { global: { plugins: [router], stubs: { RouterView: true } } })
+    const wrapper = mount(AppLayout, { global: { plugins: [router], stubs: { RouterView: true, ElPopover: { template: '<div><slot name="reference"/><slot/></div>' } } } })
     await flushPromises()
-    expect(wrapper.text()).toContain('规则怪谈')
+    expect(wrapper.text()).toContain('素材题材库')
+    expect(wrapper.text()).toContain('剧本题材库')
+    expect(wrapper.text()).toContain('全部素材题材')
+    expect(wrapper.text()).toContain('全部剧本题材')
+    expect(wrapper.find('a[href="/scripts"]').text()).toContain('剧本库')
     expect(wrapper.find('a[href="/genres/rule-horror"]').exists()).toBe(true)
+    expect(wrapper.find('a[href="/script-genres/urban-daily"]').exists()).toBe(true)
   })
 
   it('点击题材进入正确 slug 路由', async () => {
+    apiMocks.listGenreModules
+      .mockReset()
+      .mockResolvedValueOnce([moduleItem])
+      .mockResolvedValueOnce([{ ...moduleItem, id: '2', name: '都市日常', slug: 'urban-daily' }])
     const router = createTestRouter()
     await router.push('/')
     await router.isReady()
-    const wrapper = mount(AppLayout, { global: { plugins: [router], stubs: { RouterView: true } } })
+    const wrapper = mount(AppLayout, { global: { plugins: [router], stubs: { RouterView: true, ElPopover: { template: '<div><slot name="reference"/><slot/></div>' } } } })
     await flushPromises()
     await wrapper.find('a[href="/genres/rule-horror"]').trigger('click')
     await flushPromises()

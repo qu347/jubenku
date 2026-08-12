@@ -148,6 +148,12 @@ def test_sprint3_migration_roundtrip_preserves_31_materials_20_metrics_and_chine
         command.check(config)
         assert_historical_rows_unchanged()
         assert "storage_path" in {column["name"] for column in inspect(engine).get_columns("materials")}
+        assert {
+            "material_visible",
+            "script_visible",
+            "material_sort_order",
+            "script_sort_order",
+        }.issubset({column["name"] for column in inspect(engine).get_columns("genre_modules")})
         with engine.connect() as connection:
             assert connection.execute(text("SELECT COUNT(*) FROM materials")).scalar_one() == 31
             assert connection.execute(text("SELECT COUNT(*) FROM genre_metrics")).scalar_one() == 20
@@ -157,12 +163,22 @@ def test_sprint3_migration_roundtrip_preserves_31_materials_20_metrics_and_chine
                     "WHERE storage_path='' AND original_filename='' AND stored_filename='' AND file_size=0"
                 )
             ).scalar_one() == 31
+            navigation_values = connection.execute(
+                text(
+                    "SELECT material_visible,script_visible,material_sort_order,script_sort_order "
+                    "FROM genre_modules WHERE id='11111111-1111-1111-1111-111111111111'"
+                )
+            ).one()
+            assert tuple(navigation_values) == (1, 1, 0, 0)
 
         engine.dispose()
         command.downgrade(config, "20260810_0003")
         engine = create_engine(database_url)
         assert_historical_rows_unchanged()
         assert "storage_path" not in {column["name"] for column in inspect(engine).get_columns("materials")}
+        assert "material_visible" not in {
+            column["name"] for column in inspect(engine).get_columns("genre_modules")
+        }
 
         engine.dispose()
         command.upgrade(config, "head")

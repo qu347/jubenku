@@ -50,3 +50,4 @@ PACKAGE_README.txt
 # Editor and operating-system files
 .DS_Store
 Thumbs.db
+.worktrees/

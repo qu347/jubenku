@@ -10,7 +10,7 @@ import { formatDateTime } from '../../utils/format'
 import { decodeStandardTags, readableTag, standardTagGroups } from '../../utils/materialTaxonomy'
 
 const open = defineModel<boolean>({ required: true })
-const props = defineProps<{ material: Material | null; modules: GenreModule[]; initialMode?: 'view' | 'edit'; saving?: boolean }>()
+const props = withDefaults(defineProps<{ material: Material | null; modules: GenreModule[]; initialMode?: 'view' | 'edit'; saving?: boolean; libraryType?: 'material' | 'script' }>(), { libraryType: 'material' })
 const emit = defineEmits<{ save: [payload: MaterialUpdatePayload]; download: [material: Material] }>()
 const form = reactive({ title: '', genre_module_id: '', tags: [] as string[], description: '', uploaded_by: '', project_owner: '' })
 const mode = ref<'view' | 'edit'>('view')
@@ -65,7 +65,7 @@ function size(value: number) { return value < 1024 ** 2 ? `${(value / 1024).toFi
 </script>
 
 <template>
-  <el-drawer v-model="open" :title="mode === 'edit' ? '编辑剧情信息' : '剧情详情'" size="760px">
+  <el-drawer v-model="open" :title="mode === 'edit' ? `编辑${libraryType === 'script' ? '剧本' : '素材'}信息` : `${libraryType === 'script' ? '剧本' : '素材'}详情`" size="760px">
     <div v-if="material" class="detail-body">
       <template v-if="mode === 'view'">
         <div class="detail-heading"><span>{{ material.has_attachment ? material.file_extension.toUpperCase() : '正文' }}</span><div><h2>{{ material.title }}</h2><p>{{ material.description || material.legacy_summary || '暂无摘要' }}</p></div></div>
@@ -74,7 +74,7 @@ function size(value: number) { return value < 1024 ** 2 ? `${(value / 1024).toFi
           <div><dt>对接项目负责人</dt><dd>{{ material.project_owner || '未填写' }}</dd></div>
           <div><dt>上传时间</dt><dd>{{ formatDateTime(material.created_at) }}</dd></div>
           <div><dt>所属题材</dt><dd>{{ material.genre_module?.name || '—' }}</dd></div>
-          <div><dt>素材类型</dt><dd>剧情</dd></div>
+          <div><dt>{{ libraryType === 'script' ? '剧本类型' : '素材类型' }}</dt><dd>剧情</dd></div>
           <div><dt>附件</dt><dd>{{ material.has_attachment ? `${material.original_filename} · ${size(material.file_size)}` : '旧记录，无附件' }}</dd></div>
         </dl>
 

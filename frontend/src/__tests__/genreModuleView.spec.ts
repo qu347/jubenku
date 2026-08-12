@@ -47,6 +47,7 @@ function testRouter() {
     history: createMemoryHistory(),
     routes: [
       { path: '/genres/:slug', name: 'genre-module', component: GenreModuleView },
+      { path: '/script-genres/:slug', name: 'script-genre-module', component: GenreModuleView },
       { path: '/settings/modules', component: { template: '<div />' } },
       { path: '/materials', component: { template: '<div />' } },
       { path: '/genre-map', component: { template: '<div />' } },
@@ -138,10 +139,30 @@ describe('题材详情页', () => {
     await wrapper.findAll('button').find((button) => button.text() === '应用筛选')!.trigger('click')
     await flushPromises()
     expect(apiMocks.listMaterials).toHaveBeenLastCalledWith(expect.objectContaining({
+      library_type: 'material',
       genre_module_id: 'western-fantasy',
       tags: '剧情:逆袭',
       page: 1,
       page_size: 100,
     }))
+  })
+
+  it('剧本题材页只请求剧本并显示添加剧本', async () => {
+    apiMocks.getGenreModuleBySlug.mockResolvedValue(detail('western-fantasy', '西方奇幻'))
+    const router = testRouter()
+    await router.push('/script-genres/western-fantasy')
+    await router.isReady()
+    const wrapper = mount(GenreModuleView, {
+      props: { libraryType: 'script' },
+      global: { plugins: [router, createPinia()] },
+    })
+    await flushPromises()
+
+    expect(apiMocks.listMaterials).toHaveBeenCalledWith(expect.objectContaining({
+      genre_module_id: 'western-fantasy',
+      library_type: 'script',
+    }))
+    expect(wrapper.text()).toContain('添加剧本')
+    expect(wrapper.text()).toContain('剧本标题')
   })
 })

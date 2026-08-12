@@ -66,6 +66,7 @@ def material_to_dict(
     ]
     return {
         "id": material.id,
+        "library_type": material.library_type,
         "genre_module_id": material.genre_module_id,
         "genre_module": (
             {
@@ -270,6 +271,7 @@ class MaterialService:
         title: str = "",
         uploaded_by: str = "",
         project_owner: str = "",
+        library_type: str = "material",
     ) -> dict[str, Any]:
         genre_module = self._require_module(genre_module_id)
         materials: list[dict[str, Any]] = []
@@ -284,6 +286,7 @@ class MaterialService:
                 display_title = title.strip()[:100] if title.strip() and len(files) == 1 else derived_title
                 material = self.repository.create(
                     {
+                        "library_type": library_type,
                         "genre_module_id": genre_module_id,
                         "genre_module": genre_module,
                         "title": display_title,
@@ -349,6 +352,7 @@ class MaterialService:
     def list(
         self,
         *,
+        library_type: str,
         keyword: str | None,
         genre_module_id: str | None,
         material_type: str | None,
@@ -368,6 +372,7 @@ class MaterialService:
                 code="invalid_date_range",
             )
         items, total = self.repository.list(
+            library_type=library_type,
             keyword=keyword,
             genre_module_id=genre_module_id,
             material_type=material_type,

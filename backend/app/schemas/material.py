@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -65,6 +66,7 @@ class MaterialUpdate(BaseModel):
 
 class MaterialRead(BaseModel):
     id: str
+    library_type: Literal["material", "script"]
     genre_module_id: str | None
     genre_module: GenreModuleBrief | None = None
     title: str

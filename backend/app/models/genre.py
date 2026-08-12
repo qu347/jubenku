@@ -20,6 +20,18 @@ class GenreModule(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(30), default="active", nullable=False, index=True)
     visible: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
+    material_visible: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="1", nullable=False, index=True
+    )
+    script_visible: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="1", nullable=False, index=True
+    )
+    material_sort_order: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False, index=True
+    )
+    script_sort_order: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False, index=True
+    )
     profile_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
 
     sections: Mapped[list["ModuleSection"]] = relationship(

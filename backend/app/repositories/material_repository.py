@@ -41,6 +41,7 @@ class MaterialRepository:
     def list(
         self,
         *,
+        library_type: str,
         keyword: str | None,
         genre_module_id: str | None,
         material_type: str | None,
@@ -60,6 +61,7 @@ class MaterialRepository:
                 selectinload(Material.material_tag_links).joinedload(MaterialTag.tag),
             )
             .where(Material.deleted_at.is_(None))
+            .where(Material.library_type == library_type)
         )
         if keyword:
             pattern = f"%{keyword.strip()}%"

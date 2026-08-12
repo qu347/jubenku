@@ -1,4 +1,8 @@
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
+from app.models import GenreModule, Material
 
 
 def module_payload(name: str = "测试幻想", slug: str = "test-fantasy") -> dict:
@@ -52,6 +56,11 @@ def test_update_genre_module(client: TestClient) -> None:
     assert response.json()["data"]["name"] == "测试幻想·修订"
     assert response.json()["data"]["theme_color"] == "#112233"
     assert response.json()["data"]["visible"] is False
+    assert response.json()["data"]["material_visible"] is False
+    assert response.json()["data"]["script_visible"] is False
+    assert client.get(
+        "/api/genre-modules", params={"library_type": "material"}
+    ).json()["data"] == []
 
 
 def test_list_genre_modules(client: TestClient) -> None:
@@ -60,6 +69,115 @@ def test_list_genre_modules(client: TestClient) -> None:
     response = client.get("/api/genre-modules")
     assert response.status_code == 200
     assert [item["slug"] for item in response.json()["data"]] == ["genre-b", "genre-a"]
+
+
+def test_delete_empty_genre_module_permanently(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    created = create_module(client)
+
+    response = client.delete(f"/api/genre-modules/{created['id']}")
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "题材模块已永久删除"
+    assert db_session.get(GenreModule, created["id"]) is None
+    assert client.get(f"/api/genre-modules/{created['id']}").status_code == 404
+
+
+@pytest.mark.parametrize(
+    ("library_type", "expected_details"),
+    [
+        ("material", {"material_count": 1, "script_count": 0}),
+        ("script", {"material_count": 0, "script_count": 1}),
+    ],
+)
+def test_delete_genre_module_with_content_is_blocked(
+    client: TestClient,
+    db_session: Session,
+    library_type: str,
+    expected_details: dict[str, int],
+) -> None:
+    created = create_module(client)
+    db_session.add(
+        Material(
+            genre_module_id=created["id"],
+            library_type=library_type,
+            title="关联内容",
+            material_type="剧情",
+        )
+    )
+    db_session.commit()
+
+    response = client.delete(f"/api/genre-modules/{created['id']}")
+
+    assert response.status_code == 409
+    assert response.json()["error"] == {
+        "code": "genre_module_not_empty",
+        "details": expected_details,
+    }
+    assert db_session.get(GenreModule, created["id"]) is not None
+
+
+def test_genre_navigation_is_filtered_and_sorted_per_library(client: TestClient) -> None:
+    western = create_module(client, "西方奇幻", "western-fantasy")
+    xianxia = create_module(client, "东方仙侠", "eastern-xianxia")
+
+    assert client.patch(
+        f"/api/genre-modules/{western['id']}",
+        json={
+            "material_visible": True,
+            "script_visible": False,
+            "material_sort_order": 1,
+            "script_sort_order": 0,
+        },
+    ).status_code == 200
+    assert client.patch(
+        f"/api/genre-modules/{xianxia['id']}",
+        json={
+            "material_visible": True,
+            "script_visible": True,
+            "material_sort_order": 0,
+            "script_sort_order": 3,
+        },
+    ).status_code == 200
+
+    materials = client.get("/api/genre-modules", params={"library_type": "material"})
+    scripts = client.get("/api/genre-modules", params={"library_type": "script"})
+
+    assert materials.status_code == 200
+    assert scripts.status_code == 200
+    assert [item["slug"] for item in materials.json()["data"]] == [
+        "eastern-xianxia",
+        "western-fantasy",
+    ]
+    assert [item["slug"] for item in scripts.json()["data"]] == ["eastern-xianxia"]
+    assert client.get(
+        "/api/genre-modules", params={"library_type": "unknown"}
+    ).status_code == 422
+
+
+def test_reorder_genre_modules_only_updates_selected_library(client: TestClient) -> None:
+    first = create_module(client, "题材甲", "genre-a")
+    second = create_module(client, "题材乙", "genre-b")
+
+    response = client.patch(
+        "/api/genre-modules/batch/reorder",
+        params={"library_type": "script"},
+        json={
+            "items": [
+                {"id": first["id"], "sort_order": 8},
+                {"id": second["id"], "sort_order": 2},
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    modules = {item["id"]: item for item in response.json()["data"]}
+    assert modules[first["id"]]["script_sort_order"] == 8
+    assert modules[second["id"]]["script_sort_order"] == 2
+    assert modules[first["id"]]["material_sort_order"] == 3
+    assert modules[second["id"]]["material_sort_order"] == 3
 
 
 def test_create_module_section(client: TestClient) -> None:

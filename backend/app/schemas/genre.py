@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 
 GenreStatus = Literal["active", "inactive", "disabled", "archived"]
+GenreLibraryType = Literal["material", "script"]
 
 
 class GenreModuleBase(BaseModel):
@@ -27,6 +28,10 @@ class GenreModuleBase(BaseModel):
 
 class GenreModuleCreate(GenreModuleBase):
     create_default_sections: bool = True
+    material_visible: bool | None = None
+    script_visible: bool | None = None
+    material_sort_order: int | None = Field(default=None, ge=0)
+    script_sort_order: int | None = Field(default=None, ge=0)
 
 
 class GenreModuleUpdate(BaseModel):
@@ -38,6 +43,10 @@ class GenreModuleUpdate(BaseModel):
     sort_order: int | None = Field(default=None, ge=0)
     status: GenreStatus | None = None
     visible: bool | None = None
+    material_visible: bool | None = None
+    script_visible: bool | None = None
+    material_sort_order: int | None = Field(default=None, ge=0)
+    script_sort_order: int | None = Field(default=None, ge=0)
     profile_json: dict[str, Any] | None = None
 
     @field_validator("name", "slug")
@@ -53,6 +62,11 @@ class GenreModuleRead(GenreModuleBase):
     deleted_at: datetime | None = None
     section_count: int = 0
     material_count: int = 0
+    script_count: int = 0
+    material_visible: bool
+    script_visible: bool
+    material_sort_order: int
+    script_sort_order: int
 
     model_config = ConfigDict(from_attributes=True)
 

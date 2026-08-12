@@ -7,6 +7,7 @@ export interface MaterialGenreBrief {
 
 export interface Material {
   id: string
+  library_type?: 'material' | 'script'
   genre_module_id: string | null
   genre_module?: MaterialGenreBrief | null
   title: string
@@ -38,6 +39,7 @@ export type MaterialSort =
   | 'title_asc' | 'title_desc' | 'file_size_desc' | 'file_size_asc'
 
 export interface MaterialFilters {
+  library_type?: 'material' | 'script'
   keyword?: string
   genre_module_id?: string
   material_type?: string
@@ -73,6 +75,7 @@ export interface MaterialUpdatePayload {
 
 export interface MaterialUploadPayload {
   files: File[]
+  library_type?: 'material' | 'script'
   genre_module_id: string
   material_type: string
   title?: string

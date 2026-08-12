@@ -2,6 +2,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import GenreModule, Material, ModuleSection
+from app.schemas.genre import GenreLibraryType
 
 
 class GenreRepository:
@@ -16,7 +17,8 @@ class GenreRepository:
         include_deleted: bool = False,
         status: str | None = None,
         keyword: str | None = None,
-    ) -> list[tuple[GenreModule, int, int]]:
+        library_type: GenreLibraryType | None = None,
+    ) -> list[tuple[GenreModule, int, int, int]]:
         section_count = (
             select(func.count(ModuleSection.id))
             .where(
@@ -28,11 +30,25 @@ class GenreRepository:
         )
         material_count = (
             select(func.count(Material.id))
-            .where(Material.genre_module_id == GenreModule.id, Material.deleted_at.is_(None))
+            .where(
+                Material.genre_module_id == GenreModule.id,
+                Material.library_type == "material",
+                Material.deleted_at.is_(None),
+            )
             .correlate(GenreModule)
             .scalar_subquery()
         )
-        statement = select(GenreModule, section_count, material_count)
+        script_count = (
+            select(func.count(Material.id))
+            .where(
+                Material.genre_module_id == GenreModule.id,
+                Material.library_type == "script",
+                Material.deleted_at.is_(None),
+            )
+            .correlate(GenreModule)
+            .scalar_subquery()
+        )
+        statement = select(GenreModule, section_count, material_count, script_count)
         if not include_deleted:
             statement = statement.where(GenreModule.deleted_at.is_(None))
         if status:
@@ -40,7 +56,11 @@ class GenreRepository:
         elif not include_inactive:
             statement = statement.where(GenreModule.status == "active")
         if not include_hidden:
-            statement = statement.where(GenreModule.visible.is_(True))
+            visible_column = {
+                "material": GenreModule.material_visible,
+                "script": GenreModule.script_visible,
+            }.get(library_type, GenreModule.visible)
+            statement = statement.where(visible_column.is_(True))
         if keyword:
             pattern = f"%{keyword.strip()}%"
             statement = statement.where(or_(
@@ -48,9 +68,13 @@ class GenreRepository:
                 GenreModule.slug.ilike(pattern),
                 GenreModule.description.ilike(pattern),
             ))
-        return list(self.session.execute(
-            statement.order_by(GenreModule.sort_order, GenreModule.created_at)
-        ).all())
+        sort_column = {
+            "material": GenreModule.material_sort_order,
+            "script": GenreModule.script_sort_order,
+        }.get(library_type, GenreModule.sort_order)
+        return list(
+            self.session.execute(statement.order_by(sort_column, GenreModule.created_at)).all()
+        )
 
     def get_module(self, module_id: str, *, include_deleted: bool = False) -> GenreModule | None:
         statement = select(GenreModule).where(GenreModule.id == module_id)
@@ -70,7 +94,7 @@ class GenreRepository:
             statement = statement.where(GenreModule.deleted_at.is_(None))
         return self.session.scalar(statement)
 
-    def module_counts(self, module_id: str) -> tuple[int, int]:
+    def module_counts(self, module_id: str) -> tuple[int, int, int]:
         section_count = self.session.scalar(
             select(func.count(ModuleSection.id)).where(
                 ModuleSection.genre_module_id == module_id,
@@ -80,10 +104,30 @@ class GenreRepository:
         material_count = self.session.scalar(
             select(func.count(Material.id)).where(
                 Material.genre_module_id == module_id,
+                Material.library_type == "material",
                 Material.deleted_at.is_(None),
             )
         ) or 0
-        return section_count, material_count
+        script_count = self.session.scalar(
+            select(func.count(Material.id)).where(
+                Material.genre_module_id == module_id,
+                Material.library_type == "script",
+                Material.deleted_at.is_(None),
+            )
+        ) or 0
+        return section_count, material_count, script_count
+
+    def module_content_counts(self, module_id: str) -> tuple[int, int]:
+        rows = self.session.execute(
+            select(Material.library_type, func.count(Material.id))
+            .where(Material.genre_module_id == module_id)
+            .group_by(Material.library_type)
+        ).all()
+        counts = {library_type: count for library_type, count in rows}
+        return counts.get("material", 0), counts.get("script", 0)
+
+    def delete_module(self, module: GenreModule) -> None:
+        self.session.delete(module)
 
     def create_module(self, values: dict) -> GenreModule:
         module = GenreModule(**values)
@@ -100,7 +144,11 @@ class GenreRepository:
     ) -> list[tuple[ModuleSection, int]]:
         material_count = (
             select(func.count(Material.id))
-            .where(Material.section_id == ModuleSection.id, Material.deleted_at.is_(None))
+            .where(
+                Material.section_id == ModuleSection.id,
+                Material.library_type == "material",
+                Material.deleted_at.is_(None),
+            )
             .correlate(ModuleSection)
             .scalar_subquery()
         )

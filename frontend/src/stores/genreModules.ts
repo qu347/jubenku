@@ -10,11 +10,13 @@ import {
   reorderGenreModules,
   updateGenreModule,
 } from '../api/genreModules'
-import type { GenreModule, GenreModulePayload } from '../types/genreModule'
+import type { GenreLibraryType, GenreModule, GenreModulePayload } from '../types/genreModule'
 import type { ReorderItem } from '../types/moduleSection'
 
 export const useGenreModulesStore = defineStore('genre-modules', () => {
-  const modules = ref<GenreModule[]>([])
+  const materialModules = ref<GenreModule[]>([])
+  const scriptModules = ref<GenreModule[]>([])
+  const modules = materialModules
   const allModules = ref<GenreModule[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -23,10 +25,16 @@ export const useGenreModulesStore = defineStore('genre-modules', () => {
     loading.value = true
     error.value = null
     try {
-      modules.value = await listGenreModules()
+      const [materials, scripts] = await Promise.all([
+        listGenreModules({ library_type: 'material' }),
+        listGenreModules({ library_type: 'script' }),
+      ])
+      materialModules.value = materials
+      scriptModules.value = scripts
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : '题材导航加载失败'
-      modules.value = []
+      materialModules.value = []
+      scriptModules.value = []
     } finally {
       loading.value = false
     }
@@ -84,13 +92,15 @@ export const useGenreModulesStore = defineStore('genre-modules', () => {
     return duplicate
   }
 
-  async function reorderModules(items: ReorderItem[]) {
-    allModules.value = await reorderGenreModules(items)
+  async function reorderModules(items: ReorderItem[], libraryType?: GenreLibraryType) {
+    allModules.value = await reorderGenreModules(items, libraryType)
     await fetchNavigationModules()
   }
 
   return {
     modules,
+    materialModules,
+    scriptModules,
     allModules,
     loading,
     error,

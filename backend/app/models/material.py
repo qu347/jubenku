@@ -14,6 +14,9 @@ if TYPE_CHECKING:
 class Material(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "materials"
 
+    library_type: Mapped[str] = mapped_column(
+        String(20), default="material", server_default="material", nullable=False, index=True
+    )
     genre_module_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("genre_modules.id", ondelete="SET NULL"), nullable=True, index=True
     )

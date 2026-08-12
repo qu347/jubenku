@@ -9,6 +9,7 @@ from app.database.base import utc_now
 from app.models import GenreModule, ModuleSection
 from app.repositories import GenreRepository
 from app.schemas.genre import (
+    GenreLibraryType,
     GenreModuleCreate,
     GenreModuleUpdate,
     ModuleSectionCreate,
@@ -24,7 +25,12 @@ class GenreService:
         self.repository = GenreRepository(session)
 
     @staticmethod
-    def module_data(module: GenreModule, section_count: int = 0, material_count: int = 0) -> dict[str, Any]:
+    def module_data(
+        module: GenreModule,
+        section_count: int = 0,
+        material_count: int = 0,
+        script_count: int = 0,
+    ) -> dict[str, Any]:
         return {
             "id": module.id,
             "name": module.name,
@@ -35,12 +41,17 @@ class GenreService:
             "sort_order": module.sort_order,
             "status": module.status,
             "visible": module.visible,
+            "material_visible": module.material_visible,
+            "script_visible": module.script_visible,
+            "material_sort_order": module.material_sort_order,
+            "script_sort_order": module.script_sort_order,
             "profile_json": module.profile_json or {},
             "created_at": module.created_at,
             "updated_at": module.updated_at,
             "deleted_at": module.deleted_at,
             "section_count": section_count,
             "material_count": material_count,
+            "script_count": script_count,
         }
 
     @staticmethod
@@ -70,6 +81,7 @@ class GenreService:
         include_deleted: bool = False,
         module_status: str | None = None,
         keyword: str | None = None,
+        library_type: GenreLibraryType | None = None,
     ) -> list[dict[str, Any]]:
         rows = self.repository.list_modules(
             include_inactive=include_inactive,
@@ -77,28 +89,44 @@ class GenreService:
             include_deleted=include_deleted,
             status=module_status,
             keyword=keyword,
+            library_type=library_type,
         )
-        return [self.module_data(module, sections, materials) for module, sections, materials in rows]
+        return [
+            self.module_data(module, sections, materials, scripts)
+            for module, sections, materials, scripts in rows
+        ]
 
     def get_module(self, module_id: str) -> dict[str, Any]:
         module = self._module_or_404(module_id)
-        section_count, material_count = self.repository.module_counts(module.id)
-        return self.module_data(module, section_count, material_count)
+        return self.module_data(module, *self.repository.module_counts(module.id))
 
     def get_module_by_slug(self, slug: str, *, include_disabled: bool = False) -> dict[str, Any]:
         module = self.repository.get_module_by_slug(slug)
         if module is None:
             raise AppException("题材模块不存在", status_code=status.HTTP_404_NOT_FOUND, code="genre_not_found")
         sections = self.repository.list_sections(module.id, include_disabled=include_disabled)
-        section_count, material_count = self.repository.module_counts(module.id)
         return {
-            **self.module_data(module, section_count, material_count),
+            **self.module_data(module, *self.repository.module_counts(module.id)),
             "sections": [self.section_data(section, count) for section, count in sections],
         }
 
     def create_module(self, payload: GenreModuleCreate) -> dict[str, Any]:
         self._validate_module_unique(payload.slug, payload.name)
         values = payload.model_dump(exclude={"create_default_sections"})
+        values["material_visible"] = (
+            payload.visible if payload.material_visible is None else payload.material_visible
+        )
+        values["script_visible"] = (
+            payload.visible if payload.script_visible is None else payload.script_visible
+        )
+        values["material_sort_order"] = (
+            payload.sort_order
+            if payload.material_sort_order is None
+            else payload.material_sort_order
+        )
+        values["script_sort_order"] = (
+            payload.sort_order if payload.script_sort_order is None else payload.script_sort_order
+        )
         try:
             module = self.repository.create_module(values)
             if payload.create_default_sections:
@@ -109,23 +137,38 @@ class GenreService:
         except IntegrityError as exc:
             self.session.rollback()
             raise self._genre_conflict() from exc
-        section_count, material_count = self.repository.module_counts(module.id)
-        return self.module_data(module, section_count, material_count)
+        return self.module_data(module, *self.repository.module_counts(module.id))
 
     def update_module(self, module_id: str, payload: GenreModuleUpdate) -> dict[str, Any]:
         module = self._module_or_404(module_id)
         changes = payload.model_dump(exclude_unset=True)
+        if "visible" in changes:
+            changes.setdefault("material_visible", changes["visible"])
+            changes.setdefault("script_visible", changes["visible"])
+        if "sort_order" in changes:
+            changes.setdefault("material_sort_order", changes["sort_order"])
+            changes.setdefault("script_sort_order", changes["sort_order"])
         self._validate_module_unique(changes.get("slug"), changes.get("name"), exclude_id=module.id)
         for field, value in changes.items():
             setattr(module, field, value)
         self._commit_conflict_safe()
         self.session.refresh(module)
-        section_count, material_count = self.repository.module_counts(module.id)
-        return self.module_data(module, section_count, material_count)
+        return self.module_data(module, *self.repository.module_counts(module.id))
 
     def delete_module(self, module_id: str) -> dict[str, str]:
         module = self._module_or_404(module_id)
-        module.soft_delete()
+        material_count, script_count = self.repository.module_content_counts(module.id)
+        if material_count or script_count:
+            raise AppException(
+                "题材下仍有素材或剧本，请先转移或删除相关内容",
+                status_code=status.HTTP_409_CONFLICT,
+                code="genre_module_not_empty",
+                details={
+                    "material_count": material_count,
+                    "script_count": script_count,
+                },
+            )
+        self.repository.delete_module(module)
         self.session.commit()
         return {"id": module.id}
 
@@ -134,8 +177,7 @@ class GenreService:
         module.status = "active" if enabled else "inactive"
         self.session.commit()
         self.session.refresh(module)
-        section_count, material_count = self.repository.module_counts(module.id)
-        return self.module_data(module, section_count, material_count)
+        return self.module_data(module, *self.repository.module_counts(module.id))
 
     def duplicate_module(self, module_id: str) -> dict[str, Any]:
         source = self._module_or_404(module_id)
@@ -152,6 +194,10 @@ class GenreService:
                 "sort_order": source.sort_order + 1,
                 "status": "inactive",
                 "visible": False,
+                "material_visible": source.material_visible,
+                "script_visible": source.script_visible,
+                "material_sort_order": source.material_sort_order + 1,
+                "script_sort_order": source.script_sort_order + 1,
                 "profile_json": dict(source.profile_json or {}),
             })
             for section, _count in source_sections:
@@ -170,10 +216,13 @@ class GenreService:
         except Exception:
             self.session.rollback()
             raise
-        section_count, material_count = self.repository.module_counts(duplicate.id)
-        return self.module_data(duplicate, section_count, material_count)
+        return self.module_data(duplicate, *self.repository.module_counts(duplicate.id))
 
-    def reorder_modules(self, payload: ReorderPayload) -> list[dict[str, Any]]:
+    def reorder_modules(
+        self,
+        payload: ReorderPayload,
+        library_type: GenreLibraryType | None = None,
+    ) -> list[dict[str, Any]]:
         items = [(str(item.id), item.sort_order) for item in payload.items]
         modules = self.repository.get_modules_by_ids([item_id for item_id, _ in items])
         if len(modules) != len(items):
@@ -184,13 +233,24 @@ class GenreService:
             )
         order_map = dict(items)
         try:
+            sort_field = {
+                "material": "material_sort_order",
+                "script": "script_sort_order",
+            }.get(library_type, "sort_order")
             for module in modules:
-                module.sort_order = order_map[module.id]
+                setattr(module, sort_field, order_map[module.id])
+                if library_type is None:
+                    module.material_sort_order = order_map[module.id]
+                    module.script_sort_order = order_map[module.id]
             self.session.commit()
         except Exception:
             self.session.rollback()
             raise
-        return self.list_modules(include_inactive=True, include_hidden=True)
+        return self.list_modules(
+            include_inactive=True,
+            include_hidden=True,
+            library_type=library_type,
+        )
 
     def list_sections(self, module_id: str, *, include_disabled: bool = False) -> list[dict[str, Any]]:
         self._module_or_404(module_id)

@@ -2,7 +2,7 @@
 import { Delete, Download, EditPen, View } from '@element-plus/icons-vue'
 import type { Material } from '../../types/material'
 import { formatDateTime } from '../../utils/format'
-defineProps<{ items: Material[]; loading?: boolean }>()
+withDefaults(defineProps<{ items: Material[]; loading?: boolean; contentNoun?: string }>(), { contentNoun: '素材' })
 const emit = defineEmits<{ view: [item: Material]; edit: [item: Material]; download: [item: Material]; delete: [item: Material] }>()
 function size(value:number){return value<1024**2?`${(value/1024).toFixed(1)} KB`:`${(value/1024**2).toFixed(1)} MB`}
 </script>
@@ -11,7 +11,7 @@ function size(value:number){return value<1024**2?`${(value/1024).toFixed(1)} KB`
   <div v-loading="loading" class="card-grid">
     <article v-for="item in items" :key="item.id" class="material-card" @dblclick="emit('view',item)">
       <header><span class="ext" :class="{ empty: !item.has_attachment }">{{ item.has_attachment ? item.file_extension.toUpperCase() : '无附件' }}</span><small>{{ item.has_attachment ? size(item.file_size) : '旧记录' }}</small></header>
-      <div class="card-body"><b>{{ item.title }}</b><p>{{ item.description || item.legacy_summary || item.legacy_content || '暂无素材说明' }}</p><div class="meta"><span>{{ item.genre_module?.name || '未分类题材' }}</span><span>{{ item.material_type }}</span></div><div class="tags"><i v-for="tag in item.tags.slice(0,3)" :key="tag">{{ tag }}</i><em v-if="item.tags.length>3">+{{ item.tags.length-3 }}</em></div></div>
+      <div class="card-body"><b>{{ item.title }}</b><p>{{ item.description || item.legacy_summary || item.legacy_content || `暂无${contentNoun}说明` }}</p><div class="meta"><span>{{ item.genre_module?.name || '未分类题材' }}</span><span>{{ item.material_type }}</span></div><div class="tags"><i v-for="tag in item.tags.slice(0,3)" :key="tag">{{ tag }}</i><em v-if="item.tags.length>3">+{{ item.tags.length-3 }}</em></div></div>
       <footer><time>{{ formatDateTime(item.created_at) }}</time><div><el-button text :icon="View" @click="emit('view',item)"/><el-button v-if="item.has_attachment" text :icon="Download" aria-label="下载附件" @click="emit('download',item)"/><el-button v-else text :icon="Download" disabled title="该素材没有附件" aria-label="无附件，无法下载"/><el-button text :icon="EditPen" @click="emit('edit',item)"/><el-button text type="danger" :icon="Delete" @click="emit('delete',item)"/></div></footer>
     </article>
   </div>

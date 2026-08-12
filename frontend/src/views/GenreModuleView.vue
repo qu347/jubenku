@@ -16,6 +16,9 @@ import type { Material, MaterialFilters, MaterialUpdatePayload } from '../types/
 import { confirmDestructive } from '../utils/confirm'
 import { formatDateTime } from '../utils/format'
 
+const props = withDefaults(defineProps<{ libraryType?: 'material' | 'script' }>(), {
+  libraryType: 'material',
+})
 const route = useRoute()
 const genreStore = useGenreModulesStore()
 const iconRegistry = ElementIcons as Record<string, Component>
@@ -34,6 +37,8 @@ const saving = ref(false)
 const materialFilters = ref<MaterialFilters>({ sort: 'created_desc' })
 
 const isInactive = computed(() => module.value?.status !== 'active')
+const isScript = computed(() => props.libraryType === 'script')
+const contentNoun = computed(() => isScript.value ? '剧本' : '剧情')
 const modules = computed<GenreModule[]>(() => {
   if (genreStore.allModules.length) return genreStore.allModules
   if (genreStore.modules.length) return genreStore.modules
@@ -45,7 +50,13 @@ function summaryOf(item: Material) {
 }
 
 async function fetchAllMaterials(moduleId: string) {
-  const filters = { ...materialFilters.value, genre_module_id: moduleId, material_type: undefined, source: undefined }
+  const filters = {
+    ...materialFilters.value,
+    library_type: props.libraryType,
+    genre_module_id: moduleId,
+    material_type: undefined,
+    source: undefined,
+  }
   const first = await listMaterials({ ...filters, sort: filters.sort || 'created_desc', page: 1, page_size: 100 })
   if (first.pages <= 1) return first.items
   const rest = await Promise.all(Array.from({ length: first.pages - 1 }, (_, index) => listMaterials({
@@ -58,7 +69,7 @@ async function loadMaterials(moduleId: string) {
   contentLoading.value = true
   contentError.value = ''
   try { materials.value = await fetchAllMaterials(moduleId) }
-  catch (reason) { contentError.value = reason instanceof Error ? reason.message : '剧情列表加载失败' }
+  catch (reason) { contentError.value = reason instanceof Error ? reason.message : `${contentNoun.value}列表加载失败` }
   finally { contentLoading.value = false }
 }
 
@@ -80,7 +91,7 @@ async function openDetail(item: Material, mode: 'view' | 'edit' = 'view') {
     selectedMaterial.value = await getMaterial(item.id)
     detailMode.value = mode
     detailOpen.value = true
-  } catch (reason) { ElMessage.error(reason instanceof Error ? reason.message : '剧情详情加载失败') }
+  } catch (reason) { ElMessage.error(reason instanceof Error ? reason.message : `${contentNoun.value}详情加载失败`) }
 }
 
 async function saveMaterial(payload: MaterialUpdatePayload) {
@@ -91,17 +102,17 @@ async function saveMaterial(payload: MaterialUpdatePayload) {
     selectedMaterial.value = await getMaterial(selectedMaterial.value.id)
     await loadMaterials(module.value.id)
     detailMode.value = 'view'
-    ElMessage.success('剧情信息已更新')
+    ElMessage.success(`${contentNoun.value}信息已更新`)
   } finally { saving.value = false }
 }
 
 async function removeMaterial(item: Material) {
   const scope = item.has_attachment ? '数据库记录与物理文件' : '数据库记录（该素材没有附件）'
-  await confirmDestructive(`将永久删除“${item.title}”的${scope}，是否继续？`, '删除剧情')
+  await confirmDestructive(`将永久删除“${item.title}”的${scope}，是否继续？`, `删除${contentNoun.value}`)
   await deleteMaterial(item.id)
   if (selectedMaterial.value?.id === item.id) detailOpen.value = false
   if (module.value) await loadMaterials(module.value.id)
-  ElMessage.success('剧情已删除')
+  ElMessage.success(`${contentNoun.value}已删除`)
 }
 
 async function download(item: Material) {
@@ -125,32 +136,32 @@ async function resetMaterialFilters() {
   if (module.value) await loadMaterials(module.value.id)
 }
 
-watch(() => route.params.slug, () => void loadModule(), { immediate: true })
+watch([() => route.params.slug, () => props.libraryType], () => void loadModule(), { immediate: true })
 onMounted(() => void genreStore.fetchAllModules())
 </script>
 
 <template>
   <div class="genre-page">
     <div v-if="loading" class="page-state loading-state"><div class="hero-skeleton"></div><div class="content-skeleton"></div></div>
-    <section v-else-if="notFound" class="page-state message-state"><strong>404</strong><h1>题材不存在</h1><p>该题材可能已被删除，或当前地址不正确。</p><RouterLink to="/materials">返回素材库</RouterLink></section>
+    <section v-else-if="notFound" class="page-state message-state"><strong>404</strong><h1>题材不存在</h1><p>该题材可能已被删除，或当前地址不正确。</p><RouterLink :to="isScript ? '/scripts' : '/materials'">返回{{ isScript ? '剧本库' : '素材库' }}</RouterLink></section>
     <section v-else-if="error" class="page-state message-state error-state"><el-icon><Collection /></el-icon><h1>题材加载失败</h1><p>{{ error }}</p><el-button :icon="Refresh" @click="loadModule">重新加载</el-button></section>
 
     <template v-else-if="module">
       <div v-if="isInactive" class="inactive-banner">该题材已停用，仅可通过直接地址访问。</div>
       <header class="genre-hero" :style="{ '--genre-color': module.theme_color }">
-        <div class="hero-identity"><span class="module-icon"><el-icon><component :is="iconRegistry[module.icon] || Collection" /></el-icon></span><div><small>GENRE LIBRARY</small><h1>{{ module.name }}</h1><p>{{ module.description || '题材剧情素材统一归档与检索。' }}</p></div></div>
-        <div class="hero-count"><small>剧情标题</small><b>{{ materials.length }}</b><span>条已归档内容</span></div>
+        <div class="hero-identity"><span class="module-icon"><el-icon><component :is="iconRegistry[module.icon] || Collection" /></el-icon></span><div><small>{{ isScript ? 'SCRIPT GENRE LIBRARY' : 'MATERIAL GENRE LIBRARY' }}</small><h1>{{ module.name }}</h1><p>{{ module.description || (isScript ? '题材剧本统一归档与检索。' : '题材剧情素材统一归档与检索。') }}</p></div></div>
+        <div class="hero-count"><small>{{ isScript ? '剧本标题' : '剧情标题' }}</small><b>{{ materials.length }}</b><span>条已归档内容</span></div>
       </header>
 
       <main class="module-body">
         <section class="title-module surface">
-          <header><div class="module-title"><span><el-icon><Collection /></el-icon></span><div><small>ONLY MODULE</small><h2>标题</h2><p>按标题管理剧情素材，点击标题查看完整剧情。</p></div></div><div class="section-actions"><el-button :icon="Refresh" :loading="contentLoading" @click="loadMaterials(module.id)">刷新</el-button><el-button type="primary" :icon="Plus" @click="uploadOpen = true">添加剧情</el-button></div></header>
+          <header><div class="module-title"><span><el-icon><Collection /></el-icon></span><div><small>ONLY MODULE</small><h2>标题</h2><p>{{ isScript ? '按标题管理已完成剧本，点击标题查看剧本正文。' : '按标题管理剧情素材，点击标题查看完整剧情。' }}</p></div></div><div class="section-actions"><el-button :icon="Refresh" :loading="contentLoading" @click="loadMaterials(module.id)">刷新</el-button><el-button type="primary" :icon="Plus" @click="uploadOpen = true">添加{{ contentNoun }}</el-button></div></header>
 
           <MaterialFilterBar class="genre-filter" :model-value="materialFilters" :modules="modules" hide-genre @apply="applyMaterialFilters" @reset="resetMaterialFilters" />
 
-          <div v-if="contentError" class="content-state error-state"><b>剧情列表加载失败</b><span>{{ contentError }}</span><el-button :icon="Refresh" @click="loadMaterials(module.id)">重新加载</el-button></div>
+          <div v-if="contentError" class="content-state error-state"><b>{{ contentNoun }}列表加载失败</b><span>{{ contentError }}</span><el-button :icon="Refresh" @click="loadMaterials(module.id)">重新加载</el-button></div>
           <div v-else-if="contentLoading" class="table-loading"><i v-for="item in 5" :key="item"></i></div>
-          <div v-else-if="!materials.length" class="content-state"><el-icon><Collection /></el-icon><b>还没有剧情</b><span>点击右上角“添加剧情”，上传第一份剧情文件。</span><el-button type="primary" :icon="Plus" @click="uploadOpen = true">添加剧情</el-button></div>
+          <div v-else-if="!materials.length" class="content-state"><el-icon><Collection /></el-icon><b>还没有{{ contentNoun }}</b><span>点击右上角“添加{{ contentNoun }}”，上传第一份{{ contentNoun }}文件。</span><el-button type="primary" :icon="Plus" @click="uploadOpen = true">添加{{ contentNoun }}</el-button></div>
           <div v-else class="story-table-wrap">
             <table class="story-table"><thead><tr><th>标题</th><th>摘要</th><th>上传人</th><th>对接项目负责人</th><th>时间</th><th>操作</th></tr></thead><tbody>
               <tr v-for="item in materials" :key="item.id"><td><button class="story-title" @click="openDetail(item)"><span>{{ item.title }}</span><small>{{ item.has_attachment ? item.original_filename : '旧素材记录' }}</small></button></td><td><p class="summary-cell">{{ summaryOf(item) }}</p></td><td><span class="person-cell">{{ item.uploaded_by || '未填写' }}</span></td><td><span class="person-cell owner">{{ item.project_owner || '未填写' }}</span></td><td><time>{{ formatDateTime(item.created_at) }}</time></td><td><div class="row-actions"><el-button text :icon="View" aria-label="查看剧情" @click="openDetail(item)" /><el-button text :icon="EditPen" aria-label="编辑剧情" @click="openDetail(item, 'edit')" /><el-button v-if="item.has_attachment" text :icon="Download" aria-label="下载附件" @click="download(item)" /><el-button text type="danger" :icon="Delete" aria-label="删除剧情" @click="removeMaterial(item)" /></div></td></tr>
@@ -159,8 +170,8 @@ onMounted(() => void genreStore.fetchAllModules())
         </section>
       </main>
 
-      <MaterialUploadDrawer v-model="uploadOpen" :modules="modules" :initial-genre-id="module.id" initial-material-type="剧情" @complete="handleUploadComplete" />
-      <MaterialDetailDrawer v-model="detailOpen" :material="selectedMaterial" :modules="modules" :initial-mode="detailMode" :saving="saving" @save="saveMaterial" @download="download" />
+      <MaterialUploadDrawer v-model="uploadOpen" :modules="modules" :initial-genre-id="module.id" initial-material-type="剧情" :library-type="props.libraryType" @complete="handleUploadComplete" />
+      <MaterialDetailDrawer v-model="detailOpen" :material="selectedMaterial" :modules="modules" :initial-mode="detailMode" :saving="saving" :library-type="props.libraryType" @save="saveMaterial" @download="download" />
     </template>
   </div>
 </template>
