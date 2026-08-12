@@ -1,5 +1,3 @@
-import os
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -11,10 +9,10 @@ from app.core.config import settings
 
 
 def test_sprint3_migration_roundtrip_preserves_31_materials_20_metrics_and_chinese() -> None:
-    descriptor, filename = tempfile.mkstemp(prefix="script_materials_migration_", suffix=".db")
-    os.close(descriptor)
-    database_path = Path(filename)
-    database_path.unlink()
+    runtime_path = Path(__file__).resolve().parents[2] / ".runtime" / "migration"
+    runtime_path.mkdir(parents=True, exist_ok=True)
+    database_path = runtime_path / "material_platform_positioning.db"
+    database_path.unlink(missing_ok=True)
     database_url = f"sqlite:///{database_path.as_posix()}"
     original_url = settings.database_url
     config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
@@ -147,7 +145,15 @@ def test_sprint3_migration_roundtrip_preserves_31_materials_20_metrics_and_chine
         command.upgrade(config, "head")
         command.check(config)
         assert_historical_rows_unchanged()
-        assert "storage_path" in {column["name"] for column in inspect(engine).get_columns("materials")}
+        material_columns = {column["name"] for column in inspect(engine).get_columns("materials")}
+        assert {"storage_path", "upload_platform", "platform_heat"}.issubset(material_columns)
+        assert {
+            "ix_materials_upload_platform",
+            "ix_materials_platform_heat",
+        }.issubset({index["name"] for index in inspect(engine).get_indexes("materials")})
+        assert "ck_materials_platform_heat_range" in {
+            constraint["name"] for constraint in inspect(engine).get_check_constraints("materials")
+        }
         assert {
             "material_visible",
             "script_visible",
@@ -163,6 +169,12 @@ def test_sprint3_migration_roundtrip_preserves_31_materials_20_metrics_and_chine
                     "WHERE storage_path='' AND original_filename='' AND stored_filename='' AND file_size=0"
                 )
             ).scalar_one() == 31
+            assert connection.execute(
+                text(
+                    "SELECT COUNT(*) FROM materials "
+                    "WHERE upload_platform IS NULL AND platform_heat IS NULL"
+                )
+            ).scalar_one() == 31
             navigation_values = connection.execute(
                 text(
                     "SELECT material_visible,script_visible,material_sort_order,script_sort_order "
@@ -172,18 +184,25 @@ def test_sprint3_migration_roundtrip_preserves_31_materials_20_metrics_and_chine
             assert tuple(navigation_values) == (1, 1, 0, 0)
 
         engine.dispose()
-        command.downgrade(config, "20260810_0003")
+        command.downgrade(config, "20260812_0007")
         engine = create_engine(database_url)
         assert_historical_rows_unchanged()
-        assert "storage_path" not in {column["name"] for column in inspect(engine).get_columns("materials")}
-        assert "material_visible" not in {
-            column["name"] for column in inspect(engine).get_columns("genre_modules")
-        }
+        material_columns = {column["name"] for column in inspect(engine).get_columns("materials")}
+        assert "storage_path" in material_columns
+        assert "upload_platform" not in material_columns
+        assert "platform_heat" not in material_columns
 
         engine.dispose()
         command.upgrade(config, "head")
         engine = create_engine(database_url)
         assert_historical_rows_unchanged()
+        with engine.connect() as connection:
+            assert connection.execute(
+                text(
+                    "SELECT COUNT(*) FROM materials "
+                    "WHERE upload_platform IS NULL AND platform_heat IS NULL"
+                )
+            ).scalar_one() == 31
     finally:
         if engine is not None:
             engine.dispose()

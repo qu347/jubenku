@@ -37,6 +37,9 @@ def upload(
         "description": "测试说明",
         **data,
     }
+    if payload.get("library_type", "material") == "material":
+        payload.setdefault("upload_platform", "番茄小说")
+        payload.setdefault("platform_heat", "80")
     multipart = [
         ("files", (filename, content, mime_type))
         for filename, content, mime_type in (files or [("sample.txt", b"hello", "text/plain")])

@@ -83,6 +83,8 @@ async def upload_materials(
     description: Annotated[str, Form(max_length=20_000)] = "",
     uploaded_by: Annotated[str, Form(max_length=100)] = "",
     project_owner: Annotated[str, Form(max_length=100)] = "",
+    upload_platform: Annotated[str | None, Form(max_length=60)] = None,
+    platform_heat: Annotated[float | None, Form(ge=0, le=100)] = None,
     session: Session = Depends(get_db),
 ) -> dict[str, Any]:
     data = await MaterialService(session).upload(
@@ -96,6 +98,8 @@ async def upload_materials(
         description=description,
         uploaded_by=uploaded_by,
         project_owner=project_owner,
+        upload_platform=upload_platform,
+        platform_heat=platform_heat,
     )
     return {"success": True, "data": data, "message": "素材文件处理完成", "error": None}
 

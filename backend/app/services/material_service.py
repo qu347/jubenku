@@ -52,6 +52,35 @@ class UploadRejected(Exception):
     pass
 
 
+def validate_platform_metadata(
+    library_type: str,
+    upload_platform: str | None,
+    platform_heat: float | None,
+    *,
+    require_for_material: bool,
+) -> tuple[str | None, float | None]:
+    platform = upload_platform.strip() if upload_platform else None
+    if platform_heat is not None and not 0 <= platform_heat <= 100:
+        raise AppException(
+            "平台热度必须在 0 到 100 之间",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            code="invalid_platform_heat",
+        )
+    if library_type == "material" and require_for_material and (not platform or platform_heat is None):
+        raise AppException(
+            "请选择或输入上传平台，并填写平台热度",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            code="material_platform_required",
+        )
+    if bool(platform) != (platform_heat is not None):
+        raise AppException(
+            "上传平台和平台热度必须同时填写或同时清空",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            code="incomplete_platform_metadata",
+        )
+    return platform, platform_heat
+
+
 def material_to_dict(
     material: Material,
     *,
@@ -87,6 +116,8 @@ def material_to_dict(
         "source": material.source,
         "uploaded_by": material.uploaded_by,
         "project_owner": material.project_owner,
+        "upload_platform": material.upload_platform,
+        "platform_heat": material.platform_heat,
         "content_text": content_text,
         "content_truncated": content_truncated,
         "original_filename": material.original_filename,
@@ -187,8 +218,11 @@ class MaterialService:
         """Resolve every write target and reject junction/symlink escapes."""
 
         try:
+            storage_root = self.storage_root.resolve()
             resolved = target.resolve()
-            resolved.relative_to(self.storage_root)
+            normalized_storage_root = Path(str(storage_root).removeprefix("\\\\?\\"))
+            normalized_target = Path(str(resolved).removeprefix("\\\\?\\"))
+            normalized_target.relative_to(normalized_storage_root)
         except (OSError, RuntimeError, ValueError) as exc:
             raise UploadRejected("素材存储目录越界，已拒绝写入") from exc
         return resolved
@@ -198,6 +232,7 @@ class MaterialService:
         extension, mime_type = self._validate_type(original_filename, upload.content_type)
         now = datetime.now(timezone.utc)
         relative_directory = PurePosixPath(f"{now:%Y}/{now:%m}")
+        self.storage_root.mkdir(parents=True, exist_ok=True)
         destination_directory = self._resolve_upload_target(
             self.storage_root.joinpath(*relative_directory.parts)
         )
@@ -272,7 +307,15 @@ class MaterialService:
         uploaded_by: str = "",
         project_owner: str = "",
         library_type: str = "material",
+        upload_platform: str | None = None,
+        platform_heat: float | None = None,
     ) -> dict[str, Any]:
+        upload_platform, platform_heat = validate_platform_metadata(
+            library_type,
+            upload_platform,
+            platform_heat,
+            require_for_material=True,
+        )
         genre_module = self._require_module(genre_module_id)
         materials: list[dict[str, Any]] = []
         results: list[dict[str, Any]] = []
@@ -296,6 +339,8 @@ class MaterialService:
                         "source": source.strip(),
                         "uploaded_by": uploaded_by.strip(),
                         "project_owner": project_owner.strip(),
+                        "upload_platform": upload_platform,
+                        "platform_heat": platform_heat,
                         **file_values,
                     }
                 )
@@ -431,6 +476,16 @@ class MaterialService:
     def update(self, material_id: str, payload: MaterialUpdate) -> dict[str, Any]:
         material = self._get(material_id)
         changes = payload.model_dump(exclude_unset=True)
+        upload_platform, platform_heat = validate_platform_metadata(
+            material.library_type,
+            changes.get("upload_platform", material.upload_platform),
+            changes.get("platform_heat", material.platform_heat),
+            require_for_material=False,
+        )
+        if "upload_platform" in changes:
+            changes["upload_platform"] = upload_platform
+        if "platform_heat" in changes:
+            changes["platform_heat"] = platform_heat
         if "genre_module_id" in changes:
             material.genre_module = self._require_module(changes["genre_module_id"])
         if "tags" in changes:
