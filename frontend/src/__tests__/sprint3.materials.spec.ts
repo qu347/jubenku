@@ -7,7 +7,9 @@ import MaterialPreview from '../components/material/MaterialPreview.vue'
 import { useMaterialsStore } from '../stores/materials'
 
 const api = vi.hoisted(() => ({ listMaterials: vi.fn(), uploadMaterials: vi.fn(), updateMaterial: vi.fn(), deleteMaterial: vi.fn(), downloadMaterial: vi.fn(), getMaterial: vi.fn() }))
+const platformApi = vi.hoisted(() => ({ listUploadPlatforms: vi.fn(), createUploadPlatform: vi.fn() }))
 vi.mock('../api/materials', () => api)
+vi.mock('../api/uploadPlatforms', () => platformApi)
 
 const material = {
   id: 'm1', genre_module_id: 'g1', genre_module: { id: 'g1', name: '悬疑' }, title: '线索表', material_type: '研究资料',
@@ -45,7 +47,7 @@ describe('Sprint 3 素材 Store', () => {
 })
 
 describe('素材上传抽屉', () => {
-  beforeEach(() => { setActivePinia(createPinia()); vi.clearAllMocks(); api.listMaterials.mockResolvedValue({ ...page, items: [], total: 0 }); api.uploadMaterials.mockResolvedValue({ success_count: 1, failure_count: 1, materials: [material], results: [{ filename: '成功.txt', success: true }, { filename: '失败.exe', success: false, error: '不允许的扩展名' }] }) })
+  beforeEach(() => { setActivePinia(createPinia()); vi.clearAllMocks(); platformApi.listUploadPlatforms.mockResolvedValue([]); api.listMaterials.mockResolvedValue({ ...page, items: [], total: 0 }); api.uploadMaterials.mockResolvedValue({ success_count: 1, failure_count: 1, materials: [material], results: [{ filename: '成功.txt', success: true }, { filename: '失败.exe', success: false, error: '不允许的扩展名' }] }) })
   const stubs = {
     'el-drawer': { template: '<div><slot/><slot name="footer"/></div>', props: ['modelValue'] },
     'el-form': { template: '<form><slot/></form>' }, 'el-form-item': { template: '<label><slot/></label>' },
@@ -94,7 +96,7 @@ describe('素材上传抽屉', () => {
     await wrapper.findAll('button').find((button) => button.text() === '逆袭')!.trigger('click')
     await wrapper.findAll('button').find((button) => button.text() === '现代')!.trigger('click')
 
-    expect(wrapper.get('[data-test="upload-platform"]').attributes('allow-create')).toBeDefined()
+    expect(wrapper.find('[data-test="add-custom-platform"]').exists()).toBe(true)
     await wrapper.get('[data-test="submit-upload"]').trigger('click')
     expect(wrapper.text()).toContain('请选择或输入上传平台')
     expect(wrapper.text()).toContain('请填写 0 到 100 的平台热度')
