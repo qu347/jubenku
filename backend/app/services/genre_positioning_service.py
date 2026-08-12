@@ -7,7 +7,10 @@ from fastapi import status
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppException
-from app.repositories.genre_positioning_repository import GenrePositioningRepository
+from app.repositories.genre_positioning_repository import (
+    GenrePositioningRepository,
+    normalize_upload_platform,
+)
 
 
 class GenrePositioningService:
@@ -28,14 +31,62 @@ class GenrePositioningService:
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 code="invalid_heat_range",
             )
-        items = self.repository.list(
+        materials = self.repository.list(
             genre_module_id=genre_module_id,
             upload_platform=upload_platform,
-            heat_min=heat_min,
-            heat_max=heat_max,
+        )
+        grouped: dict[tuple[str, str], dict[str, Any]] = {}
+        for material in materials:
+            genre = material.genre_module
+            key = (genre.id, normalize_upload_platform(material.upload_platform))
+            item = grouped.setdefault(
+                key,
+                {
+                    "genre_module_id": genre.id,
+                    "genre_name": genre.name,
+                    "theme_color": genre.theme_color,
+                    "normalized_platform": key[1],
+                    "heat_total": 0.0,
+                    "material_count": 0,
+                    "latest_material": material,
+                },
+            )
+            item["heat_total"] += float(material.platform_heat)
+            item["material_count"] += 1
+            if self._updated_sort_key(material) > self._updated_sort_key(item["latest_material"]):
+                item["latest_material"] = material
+
+        items = []
+        for item in grouped.values():
+            average_heat = item["heat_total"] / item["material_count"]
+            if heat_min is not None and average_heat < heat_min:
+                continue
+            if heat_max is not None and average_heat > heat_max:
+                continue
+            latest_material = item["latest_material"]
+            items.append(
+                {
+                    "genre_module_id": item["genre_module_id"],
+                    "genre_name": item["genre_name"],
+                    "theme_color": item["theme_color"],
+                    "upload_platform": latest_material.upload_platform.strip(),
+                    "average_heat": round(average_heat, 1),
+                    "average_heat_raw": average_heat,
+                    "material_count": item["material_count"],
+                    "latest_updated_at": latest_material.updated_at,
+                    "normalized_platform": item["normalized_platform"],
+                }
+            )
+        items.sort(
+            key=lambda item: (
+                -item["average_heat_raw"],
+                item["genre_name"],
+                item["normalized_platform"],
+            )
         )
         for item in items:
-            item["average_heat"] = round(float(item["average_heat"]), 1)
+            del item["average_heat_raw"]
+            del item["normalized_platform"]
         return {"items": items, "total": len(items)}
 
     def timeline(self, *, upload_platform: str | None) -> dict[str, Any]:
@@ -84,16 +135,7 @@ class GenrePositioningService:
             )
         points.sort(key=lambda point: (point["period"], point["genre_name"], point["genre_module_id"]))
         periods = sorted({point["period"] for point in points})
-        latest_material = max(
-            materials,
-            key=lambda material: (
-                material.updated_at.replace(tzinfo=timezone.utc)
-                if material.updated_at.tzinfo is None
-                else material.updated_at.astimezone(timezone.utc),
-                material.id,
-            ),
-            default=None,
-        )
+        latest_material = max(materials, key=self._updated_sort_key, default=None)
 
         return {
             "upload_platform": (
@@ -103,3 +145,13 @@ class GenrePositioningService:
             "points": points,
             "total_materials": len(materials),
         }
+
+    @staticmethod
+    def _updated_sort_key(material: Any) -> tuple[Any, str]:
+        updated_at = material.updated_at
+        utc_updated_at = (
+            updated_at.replace(tzinfo=timezone.utc)
+            if updated_at.tzinfo is None
+            else updated_at.astimezone(timezone.utc)
+        )
+        return (utc_updated_at, material.id)

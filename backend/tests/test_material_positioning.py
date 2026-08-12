@@ -383,3 +383,33 @@ def test_timeline_matches_case_variants_of_non_ascii_platform_names(client, crea
     assert response.status_code == 200
     assert response.json()["data"]["total_materials"] == 1
     assert response.json()["data"]["points"][0]["genre_module_id"] == material.genre_module.id
+
+
+def test_timeline_matches_unicode_case_variants_with_sqlite(client, create_material) -> None:
+    material = create_material(platform="Ä平台", heat=88, created_at="2026-06-03T00:00:00Z")
+
+    response = client.get("/api/genre-positioning/timeline", params={"upload_platform": "ä平台"})
+
+    assert response.status_code == 200
+    assert response.json()["data"]["total_materials"] == 1
+    assert response.json()["data"]["points"][0]["genre_module_id"] == material.genre_module.id
+
+
+def test_positioning_groups_and_filters_unicode_case_variants(client, create_material, db_session: Session) -> None:
+    first = create_material(platform="Ä平台", heat=80)
+    latest = create_material(genre=first.genre_module, platform="ä平台", heat=100)
+    latest.updated_at = first.updated_at + timedelta(seconds=1)
+    db_session.commit()
+
+    response = client.get("/api/genre-positioning", params={"upload_platform": "ä平台"})
+
+    assert response.status_code == 200
+    assert response.json()["data"]["items"] == [{
+        "genre_module_id": first.genre_module.id,
+        "genre_name": first.genre_module.name,
+        "theme_color": first.genre_module.theme_color,
+        "upload_platform": "ä平台",
+        "average_heat": 90.0,
+        "material_count": 2,
+        "latest_updated_at": response.json()["data"]["items"][0]["latest_updated_at"],
+    }]
