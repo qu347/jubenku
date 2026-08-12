@@ -8,10 +8,11 @@ from sqlalchemy import create_engine, inspect, text
 from app.core.config import settings
 
 
-def test_sprint3_migration_roundtrip_preserves_31_materials_20_metrics_and_chinese() -> None:
-    runtime_path = Path(__file__).resolve().parents[2] / ".runtime" / "migration"
-    runtime_path.mkdir(parents=True, exist_ok=True)
-    database_path = runtime_path / "material_platform_positioning.db"
+def test_sprint3_migration_roundtrip_preserves_31_materials_20_metrics_and_chinese(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "material_platform_positioning.db"
+    assert database_path.is_relative_to(tmp_path)
     database_path.unlink(missing_ok=True)
     database_url = f"sqlite:///{database_path.as_posix()}"
     original_url = settings.database_url
