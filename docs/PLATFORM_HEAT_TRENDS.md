@@ -10,7 +10,7 @@
 
 ## 趋势图规则
 
-访问 `/genre-map` 后，先选择上传平台。系统按素材的 UTC 上传月份聚合：
+访问 `/genre-map` 后，平台选择框默认选中“全部平台”。“全部平台”把同一题材、同一月份在所有平台的有效素材直接合并求平均；也可改选一个具体平台。系统按素材的 UTC 上传月份聚合：
 
 - 横轴：上传月份 `YYYY-MM`。
 - 纵轴：该平台、该题材、该月素材的平台热度平均值，范围 0—100。
@@ -26,11 +26,31 @@
 ```text
 GET /api/genre-positioning
 GET /api/genre-positioning?upload_platform=抖音
+GET /api/genre-positioning/timeline
 GET /api/genre-positioning/timeline?upload_platform=抖音
 GET /api/materials?upload_platform=抖音
 ```
 
 `GET /api/genre-positioning` 返回当前平台—题材汇总，可用于平台列表和总体信息；`timeline` 返回平台、完整月份序列、按题材和月份聚合的数据点及总素材数。
+
+## 演示数据
+
+项目提供独立演示工具，用真实数据库模型生成 36 条无附件虚拟素材，覆盖抖音、番茄小说、小红书和自定义平台“星河短剧”、最多 6 个题材及最近 6 个月。演示数据不会进入普通初始化 seed，标题统一以 `【趋势演示】` 开头，并携带双重专用标识。
+
+运行前必须确认当前终端的 `DATABASE_URL` 指向允许写入的演示或便携数据库，不能误指正式数据库。生成命令：
+
+```powershell
+cd D:\文档存储\backend
+.\.venv\Scripts\python.exe -m app.tools.seed_demo_heat
+```
+
+重复执行会更新同一批演示记录，不会产生重复数据。需要清理时运行：
+
+```powershell
+.\.venv\Scripts\python.exe -m app.tools.seed_demo_heat --remove
+```
+
+清理只永久删除同时具有 `platform-heat-demo-v1` 来源和完整 `platform_heat_demo` 元数据标记的记录，不处理真实素材、题材或附件。
 
 ## 数据库迁移
 
