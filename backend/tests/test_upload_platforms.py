@@ -48,3 +48,18 @@ def test_upload_platform_list_keeps_system_platforms_before_custom_platforms(cli
     names = [item["name"] for item in listed.json()["data"]]
     assert names[:3] == ["番茄小说", "七猫", "起点中文网"]
     assert names[-1] == "星河阅读"
+
+
+def test_seed_twice_adds_system_platforms_once_and_preserves_custom_platform(client, db_session) -> None:
+    from app.models.upload_platform import UploadPlatform
+    from app.seed.run import seed_genre_modules
+
+    assert client.post("/api/upload-platforms", json={"name": "星河阅读"}).status_code == 201
+
+    seed_genre_modules(db_session)
+    seed_genre_modules(db_session)
+
+    rows = db_session.query(UploadPlatform).filter(UploadPlatform.deleted_at.is_(None)).all()
+    assert len(rows) == 11
+    assert sum(item.is_system for item in rows) == 10
+    assert {item.name for item in rows} >= {"番茄小说", "知乎", "星河阅读"}

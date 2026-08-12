@@ -2,11 +2,37 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database.session import SessionLocal
-from app.models import GenreModule, ModuleSection
+from app.models import GenreModule, ModuleSection, UploadPlatform
 from app.seed.data import DEFAULT_GENRE_MODULES, DEFAULT_SECTIONS
+from app.services.upload_platform_service import DEFAULT_UPLOAD_PLATFORMS, normalize_upload_platform_name
+
+
+def seed_upload_platforms(session: Session) -> int:
+    for sort_order, name in enumerate(DEFAULT_UPLOAD_PLATFORMS):
+        display_name, normalized_name = normalize_upload_platform_name(name)
+        platform = session.scalar(
+            select(UploadPlatform).where(UploadPlatform.normalized_name == normalized_name)
+        )
+        if platform is None:
+            session.add(
+                UploadPlatform(
+                    name=display_name,
+                    normalized_name=normalized_name,
+                    is_system=True,
+                    sort_order=sort_order,
+                )
+            )
+        else:
+            platform.name = display_name
+            platform.is_system = True
+            platform.sort_order = sort_order
+            platform.deleted_at = None
+    session.flush()
+    return session.query(UploadPlatform).filter(UploadPlatform.deleted_at.is_(None)).count()
 
 
 def seed_genre_modules(session: Session) -> tuple[int, int]:
+    seed_upload_platforms(session)
     for sort_order, item in enumerate(DEFAULT_GENRE_MODULES):
         module = session.scalar(select(GenreModule).where(GenreModule.slug == item["slug"]))
         if module is None:
