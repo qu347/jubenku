@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add an explicit custom upload-platform workflow and populate the portable development database with removable demo materials that visibly exercise the platform-by-genre monthly heat chart.
+**Goal:** Add an explicit custom upload-platform workflow, an all-platform genre overview, and removable demo materials that visibly exercise the platform-by-genre monthly heat chart.
 
 **Architecture:** Reuse one focused Vue platform selector in material upload and edit forms; persisted materials remain the only source for the trend-page platform list. Add an idempotent SQLAlchemy CLI tool that marks synthetic materials in both `source` and `metadata_json`, creates no attachments, and can remove only records carrying both markers.
 
@@ -16,6 +16,8 @@
 - Demo records must not create fake attachment files or modify existing materials.
 - Demo generation must be deterministic, transactional, idempotent, and removable with an explicit `--remove` option.
 - The trend selector continues to list only platforms returned from valid material aggregation.
+- The selector prepends `全部平台`; this synthetic option is not persisted as a material platform.
+- All-platform averages are calculated from all matching material rows, not from unweighted platform averages.
 - All production code changes follow test-first RED/GREEN cycles.
 
 ---
@@ -102,7 +104,78 @@ git commit -m "feat: add explicit custom platform entry"
 
 ---
 
-### Task 2: Idempotent Demo Heat Data Tool
+### Task 2: All-Platform Genre Trend Overview
+
+**Files:**
+- Modify: `backend/app/api/endpoints/genre_positioning.py`
+- Modify: `backend/app/repositories/genre_positioning_repository.py`
+- Modify: `backend/app/services/genre_positioning_service.py`
+- Modify: `backend/app/schemas/genre_positioning.py`
+- Modify: `backend/tests/test_material_positioning.py`
+- Modify: `frontend/src/api/genrePositioning.ts`
+- Modify: `frontend/src/stores/genrePositioning.ts`
+- Modify: `frontend/src/views/GenreMapView.vue`
+- Modify: `frontend/src/__tests__/genrePositioning.spec.ts`
+
+**Interfaces:**
+- `GET /api/genre-positioning/timeline` without `upload_platform` returns an all-platform timeline.
+- `GET /api/genre-positioning/timeline?upload_platform=抖音` retains the existing single-platform behavior.
+- `getGenrePositioningTimeline(uploadPlatform?: string)` omits the query parameter for all-platform mode.
+- Store constant/display value: `ALL_PLATFORMS = '全部平台'`.
+
+- [ ] **Step 1: Write failing backend aggregation test**
+
+Create two platforms for the same genre and month with heats `40`, `80`, and `100`, where one platform owns two rows. Call the timeline endpoint without a platform and assert one point has `average_heat == 73.33`, `material_count == 3`. Assert a request with a concrete platform still returns only its rows.
+
+- [ ] **Step 2: Run backend test and verify RED**
+
+Run:
+
+```powershell
+cd D:\文档存储\backend
+.\.venv\Scripts\python.exe -m pytest tests/test_material_positioning.py -q -p no:cacheprovider --basetemp '..\.runtime\all-platform-red'
+```
+
+Expected: the new test fails because a missing platform currently returns 422.
+
+- [ ] **Step 3: Implement optional platform aggregation**
+
+Make the endpoint query optional. Repository candidate selection continues to require valid material platform and heat fields; when a platform is supplied, apply existing normalized matching, otherwise retain all platforms. Service grouping remains by `(genre_module_id, UTC month)` and calculates `sum(platform_heat) / material_count` over material rows. Response uses `upload_platform='全部平台'` for this mode.
+
+- [ ] **Step 4: Write failing frontend default-option test**
+
+Update the store/view test to expect `['全部平台', '抖音', '自定义平台']`, default selection `全部平台`, and the first timeline call without a platform argument. Assert selecting `抖音` updates the route query and calls the concrete platform API exactly once.
+
+- [ ] **Step 5: Run frontend test and verify RED**
+
+Run:
+
+```powershell
+cd D:\文档存储\frontend
+node .\node_modules\vitest\vitest.mjs run src/__tests__/genrePositioning.spec.ts
+```
+
+Expected: FAIL because the current store selects the first real platform and always sends a platform.
+
+- [ ] **Step 6: Implement the all-platform selector state**
+
+Prepend `ALL_PLATFORMS` after deduplicating real platforms. Treat absent `upload_platform` route query as all-platform mode. Selecting all removes the route query and calls the timeline API without the parameter; concrete platform selection preserves the current query behavior. Summary and chart heading display `全部平台`.
+
+- [ ] **Step 7: Run focused backend/frontend tests and commit**
+
+```powershell
+cd D:\文档存储\backend
+.\.venv\Scripts\python.exe -m pytest tests/test_material_positioning.py -q -p no:cacheprovider --basetemp '..\.runtime\all-platform-green'
+cd D:\文档存储\frontend
+node .\node_modules\vitest\vitest.mjs run src/__tests__/genrePositioning.spec.ts src/__tests__/sprint3.navigation.spec.ts
+node .\node_modules\vue-tsc\bin\vue-tsc.js -b
+git add backend frontend/src
+git commit -m "feat: add all-platform genre trend overview"
+```
+
+---
+
+### Task 3: Idempotent Demo Heat Data Tool
 
 **Files:**
 - Create: `backend/app/tools/seed_demo_heat.py`
@@ -190,7 +263,7 @@ git commit -m "feat: add removable heat trend demo data"
 
 ---
 
-### Task 3: Populate Portable Instance and Verify the Result
+### Task 4: Populate Portable Instance and Verify the Result
 
 **Files:**
 - Modify: `docs/PLATFORM_HEAT_TRENDS.md`
@@ -248,7 +321,7 @@ Expected: readiness is `ready`; aggregate includes all four demo platforms; `星
 
 - [ ] **Step 6: Manual browser acceptance**
 
-Open `/materials`, confirm “＋添加自定义平台” is visible in the upload drawer, then open `/genre-map`. Verify the platform dropdown includes 抖音、番茄小说、小红书、星河短剧; selecting 星河短剧 renders multiple smooth genre curves; tooltip values are readable; switching to table and clicking a row routes to the matching material filter.
+Open `/materials`, confirm “＋添加自定义平台” is visible in the upload drawer, then open `/genre-map`. Verify the platform dropdown starts with 全部平台 and also includes 抖音、番茄小说、小红书、星河短剧; the default all-platform view and 星河短剧 each render multiple smooth genre curves; tooltip values are readable; switching to table and clicking a row routes to the matching material filter.
 
 - [ ] **Step 7: Commit documentation and final state**
 
