@@ -103,7 +103,13 @@ if exist "%PACKAGE_DATA%\storage\materials" if not exist "%STORAGE_DIR%\material
 for %%V in (SETTINGS_ENV_FILE APP_ENV APP_HOST APP_PORT API_PREFIX DEBUG DATABASE_URL STORAGE_ROOT MATERIAL_STORAGE_PATH LOG_DIR BACKUP_ROOT TEMP_ROOT SERVE_FRONTEND FRONTEND_DIST CORS_ALLOWED_ORIGINS CORS_ORIGINS PYTHONOPTIMIZE) do set "%%V="
 set "APP_ENV=production"
 set "APP_HOST=127.0.0.1"
-set "APP_PORT=8000"
+set "APP_PORT="
+for /f "usebackq delims=" %%P in (`"%PYTHON_EXE%" "%BACKEND_DIR%\app\tools\select_port.py"`) do set "APP_PORT=%%P"
+if not defined APP_PORT (
+  echo [错误] 8000 至 8020 端口均不可用，请关闭占用程序后重试。
+  pause
+  exit /b 1
+)
 set "API_PREFIX=/api"
 set "DEBUG=false"
 set "DATABASE_URL=sqlite:///../.runtime/portable/database/script_materials.db"
@@ -114,7 +120,7 @@ set "BACKUP_ROOT=../.runtime/portable/backups"
 set "TEMP_ROOT=../.runtime/portable/temp"
 set "SERVE_FRONTEND=true"
 set "FRONTEND_DIST=../frontend/dist"
-set "CORS_ALLOWED_ORIGINS=http://127.0.0.1:8000,http://localhost:8000"
+set "CORS_ALLOWED_ORIGINS=http://127.0.0.1:%APP_PORT%,http://localhost:%APP_PORT%"
 set "SETTINGS_ENV_FILE=%DATA_ROOT%\launcher.env"
 
 pushd "%BACKEND_DIR%" || exit /b 1
@@ -140,12 +146,12 @@ if "%FRESH_DATABASE%"=="1" if not exist "%PACKAGE_DATA%\database\script_material
 )
 
 echo.
-echo [成功] 系统将在浏览器中打开：http://127.0.0.1:8000/materials
+echo [成功] 系统将在浏览器中打开：http://127.0.0.1:%APP_PORT%/materials
 echo [提示] 请保持本窗口运行；需要停止时按 Ctrl+C。
 echo.
 
-start "" /b powershell.exe -NoProfile -WindowStyle Hidden -Command "Start-Sleep -Seconds 2; Start-Process 'http://127.0.0.1:8000/materials'" >nul 2>&1
-"%PYTHON_EXE%" -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
+start "" /b powershell.exe -NoProfile -WindowStyle Hidden -Command "Start-Sleep -Seconds 2; Start-Process 'http://127.0.0.1:%APP_PORT%/materials'" >nul 2>&1
+"%PYTHON_EXE%" -m uvicorn app.main:app --host 127.0.0.1 --port %APP_PORT% --workers 1
 set "EXIT_CODE=%ERRORLEVEL%"
 
 popd
