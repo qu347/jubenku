@@ -44,6 +44,7 @@ class MaterialRepository:
         library_type: str,
         keyword: str | None,
         genre_module_id: str | None,
+        upload_platform: str | None,
         material_type: str | None,
         file_extension: str | None,
         tags: list[str],
@@ -77,6 +78,10 @@ class MaterialRepository:
             )
         if genre_module_id:
             statement = statement.where(Material.genre_module_id == genre_module_id)
+        if upload_platform:
+            statement = statement.where(
+                func.lower(func.trim(Material.upload_platform)) == upload_platform.strip().casefold()
+            )
         if material_type:
             statement = statement.where(Material.material_type == material_type)
         if file_extension:
