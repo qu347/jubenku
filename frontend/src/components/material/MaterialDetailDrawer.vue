@@ -4,11 +4,11 @@ import { Download, EditPen } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import MaterialPreview from './MaterialPreview.vue'
 import StandardTagSelector from './StandardTagSelector.vue'
+import UploadPlatformSelect from './UploadPlatformSelect.vue'
 import type { GenreModule } from '../../types/genreModule'
 import type { Material, MaterialUpdatePayload } from '../../types/material'
 import { formatDateTime } from '../../utils/format'
 import { decodeStandardTags, readableTag, standardTagGroups } from '../../utils/materialTaxonomy'
-import { COMMON_UPLOAD_PLATFORMS } from '../../config/materials'
 
 const open = defineModel<boolean>({ required: true })
 const props = withDefaults(defineProps<{ material: Material | null; modules: GenreModule[]; initialMode?: 'view' | 'edit'; saving?: boolean; libraryType?: 'material' | 'script' }>(), { libraryType: 'material' })
@@ -100,7 +100,7 @@ function size(value: number) { return value < 1024 ** 2 ? `${(value / 1024).toFi
         <el-form-item label="标题" required><el-input v-model="form.title" maxlength="100" show-word-limit /></el-form-item>
         <el-form-item label="摘要" required><el-input v-model="form.description" type="textarea" :rows="3" maxlength="20000" show-word-limit /></el-form-item>
         <div class="edit-grid"><el-form-item label="上传人" required><el-input v-model="form.uploaded_by" maxlength="100" /></el-form-item><el-form-item label="对接项目负责人" required><el-input v-model="form.project_owner" maxlength="100" /></el-form-item></div>
-        <div v-if="libraryType === 'material'" class="edit-grid"><el-form-item label="上传平台"><el-select v-model="form.upload_platform" filterable allow-create default-first-option clearable class="full" placeholder="选择或输入上传平台"><el-option v-for="item in COMMON_UPLOAD_PLATFORMS" :key="item" :label="item" :value="item" /></el-select></el-form-item><el-form-item label="平台热度"><el-input-number v-model="form.platform_heat" :min="0" :max="100" :step="1" class="full" /></el-form-item></div>
+        <div v-if="libraryType === 'material'" class="edit-grid"><el-form-item label="上传平台"><UploadPlatformSelect v-model="form.upload_platform" select-test-id="edit-platform" /></el-form-item><el-form-item label="平台热度"><el-input-number v-model="form.platform_heat" :min="0" :max="100" :step="1" class="full" /></el-form-item></div>
         <el-form-item label="所属题材" required><el-select v-model="form.genre_module_id" filterable class="full"><el-option v-for="item in modules" :key="item.id" :label="item.name" :value="item.id" /></el-select></el-form-item>
         <div class="taxonomy-field"><div class="taxonomy-title"><b>标准素材标签</b><span>剧情和角色可多选，时代背景为单选；可补充自定义标签</span></div><StandardTagSelector v-model="form.tags" /></div>
         <div class="locked-file"><b>文件字段不可编辑</b><span>{{ material.has_attachment ? `${material.original_filename} · ${size(material.file_size)} · ${material.mime_type}` : '该旧素材记录没有附件' }}</span></div>

@@ -8,6 +8,7 @@ import MaterialDetailDrawer from '../components/material/MaterialDetailDrawer.vu
 import MaterialCardGrid from '../components/material/MaterialCardGrid.vue'
 import MaterialTable from '../components/material/MaterialTable.vue'
 import MaterialFilterBar from '../components/material/MaterialFilterBar.vue'
+import UploadPlatformSelect from '../components/material/UploadPlatformSelect.vue'
 import MaterialLibraryView from '../views/materials/MaterialLibraryView.vue'
 
 const http = vi.hoisted(() => ({ request: vi.fn(), requestBlob: vi.fn() }))
@@ -94,6 +95,52 @@ describe('素材平台 API', () => {
     const postedFormData = http.request.mock.calls[0]?.[0].data as FormData
     expect(postedFormData.has('upload_platform')).toBe(false)
     expect(postedFormData.has('platform_heat')).toBe(false)
+  })
+})
+
+describe('自定义上传平台控件', () => {
+  const platformSelectStubs = {
+    'el-select': {
+      props: ['modelValue'],
+      emits: ['update:modelValue'],
+      template: '<div data-test="platform-select"><slot /></div>',
+    },
+    'el-option': true,
+    'el-input': {
+      props: ['modelValue'],
+      emits: ['update:modelValue'],
+      template: '<input data-test="custom-platform-input" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+    },
+    'el-button': {
+      props: ['disabled'],
+      template: '<button :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
+    },
+  }
+
+  it('通过明确入口添加并选中自定义平台', async () => {
+    const wrapper = mount(UploadPlatformSelect, {
+      props: { modelValue: '' },
+      global: { stubs: platformSelectStubs },
+    })
+
+    await wrapper.get('[data-test="add-custom-platform"]').trigger('click')
+    await wrapper.get('[data-test="custom-platform-input"]').setValue('  星河短剧  ')
+    await wrapper.get('[data-test="confirm-custom-platform"]').trigger('click')
+
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['星河短剧'])
+  })
+
+  it('自定义平台为空时不更新选中值', async () => {
+    const wrapper = mount(UploadPlatformSelect, {
+      props: { modelValue: '' },
+      global: { stubs: platformSelectStubs },
+    })
+
+    await wrapper.get('[data-test="add-custom-platform"]').trigger('click')
+    await wrapper.get('[data-test="custom-platform-input"]').setValue('   ')
+    await wrapper.get('[data-test="confirm-custom-platform"]').trigger('click')
+
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
   })
 })
 

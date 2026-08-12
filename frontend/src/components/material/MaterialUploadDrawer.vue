@@ -6,8 +6,8 @@ import { useMaterialsStore } from '../../stores/materials'
 import type { GenreModule } from '../../types/genreModule'
 import type { MaterialUploadFileResult } from '../../types/material'
 import StandardTagSelector from './StandardTagSelector.vue'
+import UploadPlatformSelect from './UploadPlatformSelect.vue'
 import { decodeStandardTags } from '../../utils/materialTaxonomy'
-import { COMMON_UPLOAD_PLATFORMS } from '../../config/materials'
 
 const open = defineModel<boolean>({ required: true })
 const props = withDefaults(defineProps<{
@@ -133,7 +133,7 @@ async function submit() {
           <el-form-item :label="libraryType === 'script' ? '剧本类型' : '素材类型'"><el-input model-value="剧情" disabled /></el-form-item>
         </div>
         <div v-if="libraryType === 'material'" class="form-grid">
-          <el-form-item label="上传平台" required><el-select v-model="uploadPlatform" data-test="upload-platform" filterable allow-create default-first-option clearable class="full" placeholder="选择或输入上传平台"><el-option v-for="item in COMMON_UPLOAD_PLATFORMS" :key="item" :label="item" :value="item" /></el-select></el-form-item>
+          <el-form-item label="上传平台" required><UploadPlatformSelect v-model="uploadPlatform" select-test-id="upload-platform" /></el-form-item>
           <el-form-item label="平台热度" required><el-input-number v-model="platformHeat" data-test="platform-heat" :min="0" :max="100" :step="1" class="full" placeholder="0 到 100" /></el-form-item>
         </div>
         <el-form-item label="标题" :required="singleFile"><el-input v-model="title" data-testid="story-title-input" :disabled="!singleFile" maxlength="100" show-word-limit :placeholder="singleFile ? '输入列表中显示的标题' : '批量上传时自动使用文件名作为标题'" /></el-form-item>
