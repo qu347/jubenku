@@ -1,16 +1,20 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import StandardTagSelector from './StandardTagSelector.vue'
 import type { GenreModule } from '../../types/genreModule'
 import type { MaterialFilters } from '../../types/material'
-import { COMMON_UPLOAD_PLATFORMS } from '../../config/materials'
+import { useUploadPlatformsStore } from '../../stores/uploadPlatforms'
 
 const props = withDefaults(defineProps<{ modelValue: MaterialFilters; modules: GenreModule[]; hideGenre?: boolean; libraryType?: 'material' | 'script' }>(), { hideGenre: false, libraryType: 'material' })
 const emit = defineEmits<{ apply: [filters: MaterialFilters]; reset: [] }>()
+const uploadPlatforms = useUploadPlatformsStore()
 const draft = reactive<MaterialFilters>({})
 const emptyFilters: MaterialFilters = { keyword: undefined, genre_module_id: undefined, material_type: undefined, file_extension: undefined, tags: undefined, source: undefined, upload_platform: undefined, uploaded_from: undefined, uploaded_to: undefined, sort: 'created_desc', page: 1, page_size: 20 }
 watch(() => props.modelValue, (value) => Object.assign(draft, emptyFilters, value), { immediate: true, deep: true })
+onMounted(() => {
+  if (props.libraryType === 'material') void uploadPlatforms.fetchPlatforms().catch(() => undefined)
+})
 
 const fileTypes = ['pdf', 'docx', 'xlsx', 'csv', 'txt', 'md', 'jpg', 'jpeg', 'png']
 const filterTags = computed<string[]>({
@@ -33,8 +37,8 @@ function syncTaxonomyOpen(event: Event) { taxonomyOpen.value = (event.currentTar
       <el-select v-model="draft.file_extension" clearable placeholder="文件类型">
         <el-option v-for="item in fileTypes" :key="item" :label="item.toUpperCase()" :value="item" />
       </el-select>
-      <el-select v-if="libraryType === 'material'" v-model="draft.upload_platform" data-test="filter-platform" clearable filterable allow-create default-first-option placeholder="上传平台">
-        <el-option v-for="item in COMMON_UPLOAD_PLATFORMS" :key="item" :label="item" :value="item" />
+      <el-select v-if="libraryType === 'material'" v-model="draft.upload_platform" data-test="filter-platform" clearable filterable default-first-option placeholder="上传平台">
+        <el-option v-for="item in uploadPlatforms.platforms" :key="item" :label="item" :value="item" />
       </el-select>
       <el-date-picker v-model="draft.uploaded_from" type="date" value-format="YYYY-MM-DD" placeholder="上传开始日期" />
       <el-date-picker v-model="draft.uploaded_to" type="date" value-format="YYYY-MM-DD" placeholder="上传结束日期" />

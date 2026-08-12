@@ -11,7 +11,13 @@ import MaterialFilterBar from '../components/material/MaterialFilterBar.vue'
 import UploadPlatformSelect from '../components/material/UploadPlatformSelect.vue'
 import MaterialLibraryView from '../views/materials/MaterialLibraryView.vue'
 
-const http = vi.hoisted(() => ({ request: vi.fn(), requestBlob: vi.fn() }))
+const http = vi.hoisted(() => ({
+  request: vi.fn(),
+  requestBlob: vi.fn(),
+  ApiError: class ApiError extends Error {
+    constructor(message: string, public readonly status?: number) { super(message) }
+  },
+}))
 const genreApi = vi.hoisted(() => ({ listGenreModules: vi.fn() }))
 vi.mock('../api/http', () => http)
 vi.mock('../api/genreModules', () => ({ ...genreApi, createGenreModule: vi.fn(), updateGenreModule: vi.fn(), deleteGenreModule: vi.fn(), duplicateGenreModule: vi.fn(), enableGenreModule: vi.fn(), disableGenreModule: vi.fn(), reorderGenreModules: vi.fn() }))
@@ -44,7 +50,7 @@ const editDrawerStubs = {
   'el-select': {
     props: ['modelValue', 'placeholder'],
     emits: ['update:modelValue'],
-    template: '<input v-if="placeholder === \'选择或输入上传平台\'" data-test="edit-platform" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" /><select v-else :value="modelValue"><slot /></select>',
+    template: '<input v-if="placeholder === \'选择上传平台\'" data-test="edit-platform" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" /><select v-else :value="modelValue"><slot /></select>',
   },
   'el-option': true,
   'el-input-number': {
@@ -99,6 +105,14 @@ describe('素材平台 API', () => {
 })
 
 describe('自定义上传平台控件', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+    http.request.mockImplementation(async (config: { method: string; data?: { name: string } }) => config.method === 'GET'
+      ? []
+      : { id: 'p1', name: config.data?.name || '', is_system: false })
+  })
+
   const platformSelectStubs = {
     'el-select': {
       props: ['modelValue'],
@@ -126,6 +140,7 @@ describe('自定义上传平台控件', () => {
     await wrapper.get('[data-test="add-custom-platform"]').trigger('click')
     await wrapper.get('[data-test="custom-platform-input"]').setValue('  星河短剧  ')
     await wrapper.get('[data-test="confirm-custom-platform"]').trigger('click')
+    await flushPromises()
 
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['星河短剧'])
   })
@@ -142,6 +157,44 @@ describe('自定义上传平台控件', () => {
 
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
   })
+
+  it('添加自定义平台时先持久化再选中', async () => {
+    const wrapper = mount(UploadPlatformSelect, {
+      props: { modelValue: '' },
+      global: { stubs: platformSelectStubs },
+    })
+
+    await wrapper.get('[data-test="add-custom-platform"]').trigger('click')
+    await wrapper.get('[data-test="custom-platform-input"]').setValue('  星河阅读  ')
+    await wrapper.get('[data-test="confirm-custom-platform"]').trigger('click')
+    await flushPromises()
+
+    expect(http.request).toHaveBeenCalledWith({
+      method: 'POST',
+      url: '/upload-platforms',
+      data: { name: '星河阅读' },
+    })
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['星河阅读'])
+  })
+
+  it('平台保存失败时保留用户输入以便重试', async () => {
+    http.request.mockImplementation(async (config: { method: string }) => {
+      if (config.method === 'GET') return []
+      throw new Error('保存失败')
+    })
+    const wrapper = mount(UploadPlatformSelect, {
+      props: { modelValue: '' },
+      global: { stubs: platformSelectStubs },
+    })
+
+    await wrapper.get('[data-test="add-custom-platform"]').trigger('click')
+    await wrapper.get('[data-test="custom-platform-input"]').setValue('星河阅读')
+    await wrapper.get('[data-test="confirm-custom-platform"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="custom-platform-input"]').attributes('value')).toBe('星河阅读')
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+  })
 })
 
 describe('素材平台展示', () => {
@@ -156,7 +209,7 @@ describe('素材平台展示', () => {
     expect(cards.text()).toContain('平台信息待补充')
   })
 
-  it('素材编辑提供可自定义平台和限定范围的热度控件', async () => {
+  it('素材编辑提供持久化平台入口和限定范围的热度控件', async () => {
     const detail = mount(MaterialDetailDrawer, {
       props: { modelValue: true, initialMode: 'edit', material: { ...material, upload_platform: '番茄小说', platform_heat: 88 }, modules: [] },
       global: {
@@ -175,7 +228,7 @@ describe('素材平台展示', () => {
         },
       },
     })
-    expect(detail.get('[data-test="edit-platform"]').attributes('data-allow-create')).toBeDefined()
+    expect(detail.find('[data-test="add-custom-platform"]').exists()).toBe(true)
     expect(detail.get('[data-test="edit-heat"]').attributes()).toMatchObject({ min: '0', max: '100', step: '1' })
   })
 
@@ -235,10 +288,10 @@ describe('素材平台展示', () => {
 describe('素材平台筛选', () => {
   beforeEach(() => { setActivePinia(createPinia()); vi.clearAllMocks(); http.request.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 20, pages: 0 }); genreApi.listGenreModules.mockResolvedValue([]) })
 
-  it('筛选栏允许自定义平台，并在素材路由中保留 upload_platform', async () => {
+  it('筛选栏使用已保存平台，并在素材路由中保留 upload_platform', async () => {
     const filterOptions = { global: { stubs: { 'el-input': true, 'el-date-picker': true, 'el-option': true, 'el-select': { props: ['modelValue', 'allowCreate', 'filterable', 'defaultFirstOption'], template: '<select :data-allow-create="allowCreate"><slot /></select>' }, StandardTagSelector: true, 'el-button': { template: '<button><slot /></button>' } } } }
     const filter = mount(MaterialFilterBar, { props: { modelValue: {}, modules: [] }, ...filterOptions })
-    expect(filter.get('[data-test="filter-platform"]').attributes('data-allow-create')).toBeDefined()
+    expect(filter.find('[data-test="filter-platform"]').exists()).toBe(true)
     const scriptFilter = mount(MaterialFilterBar, { props: { modelValue: {}, modules: [], libraryType: 'script' }, ...filterOptions })
     expect(scriptFilter.find('[data-test="filter-platform"]').exists()).toBe(false)
 

@@ -1,19 +1,24 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { COMMON_UPLOAD_PLATFORMS } from '../../config/materials'
+import { useUploadPlatformsStore } from '../../stores/uploadPlatforms'
 
 const model = defineModel<string>({ required: true })
 const props = withDefaults(defineProps<{
   options?: readonly string[]
   selectTestId?: string
 }>(), {
-  options: () => COMMON_UPLOAD_PLATFORMS,
   selectTestId: 'upload-platform',
 })
 
+const store = useUploadPlatformsStore()
 const adding = ref(false)
 const customName = ref('')
+const saving = ref(false)
+
+onMounted(() => {
+  void store.fetchPlatforms().catch(() => undefined)
+})
 
 function platformKey(value: string) {
   return value.trim().normalize('NFKC').toLocaleLowerCase()
@@ -21,7 +26,7 @@ function platformKey(value: string) {
 
 const visibleOptions = computed(() => {
   const unique = new Map<string, string>()
-  for (const option of props.options) {
+  for (const option of props.options ?? store.platforms) {
     const display = option.trim().normalize('NFKC')
     if (display && !unique.has(platformKey(display))) unique.set(platformKey(display), display)
   }
@@ -40,13 +45,25 @@ function cancelCustomInput() {
   adding.value = false
 }
 
-function confirmCustom() {
+async function confirmCustom() {
   const value = customName.value.trim().normalize('NFKC')
   if (!value) return ElMessage.warning('请输入自定义平台名称')
   if (value.length > 60) return ElMessage.warning('平台名称不能超过 60 个字符')
   const existing = visibleOptions.value.find((option) => platformKey(option) === platformKey(value))
-  model.value = existing || value
-  cancelCustomInput()
+  if (existing) {
+    model.value = existing
+    cancelCustomInput()
+    return
+  }
+  saving.value = true
+  try {
+    model.value = await store.createPlatform(value)
+    cancelCustomInput()
+  } catch {
+    return
+  } finally {
+    saving.value = false
+  }
 }
 </script>
 
@@ -56,11 +73,10 @@ function confirmCustom() {
       v-model="model"
       :data-test="selectTestId"
       filterable
-      allow-create
       default-first-option
       clearable
       class="full"
-      placeholder="选择或输入上传平台"
+      placeholder="选择上传平台"
     >
       <el-option v-for="item in visibleOptions" :key="item" :label="item" :value="item" />
     </el-select>
@@ -75,8 +91,8 @@ function confirmCustom() {
         placeholder="输入平台名称，例如：星河短剧"
         @keyup.enter="confirmCustom"
       />
-      <button data-test="confirm-custom-platform" class="confirm" type="button" @click="confirmCustom">添加</button>
-      <button class="cancel" type="button" @click="cancelCustomInput">取消</button>
+      <button data-test="confirm-custom-platform" class="confirm" type="button" :disabled="saving" @click="confirmCustom">{{ saving ? '保存中' : '添加' }}</button>
+      <button class="cancel" type="button" :disabled="saving" @click="cancelCustomInput">取消</button>
     </div>
     <small>常用平台可直接选择，列表中没有时可添加自定义平台。</small>
   </div>
