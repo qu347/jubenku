@@ -51,12 +51,12 @@ onMounted(() => store.fetchPlatforms(routePlatform()))
 <template>
   <div class="page-shell">
     <header class="page-heading">
-      <div><span class="eyebrow">PLATFORM GENRE TRENDS</span><h1>题材平台热度趋势图</h1><p>选择一个上传平台，查看各题材按素材上传月份汇总的真实平均热度曲线。</p></div>
+      <div><span class="eyebrow">PLATFORM GENRE TRENDS</span><h1>题材平台热度趋势图</h1><p>选择全部平台查看总体趋势，或选择具体上传平台查看各题材的月度平均热度曲线。</p></div>
       <label class="platform-picker"><span>选择平台</span><el-select :model-value="store.selectedPlatform" filterable placeholder="请选择上传平台" @change="changePlatform"><el-option v-for="platform in store.platforms" :key="platform" :label="platform" :value="platform" /></el-select></label>
     </header>
 
     <section class="summary">
-      <div><small>当前平台</small><b class="platform-name">{{ store.selectedPlatform || '—' }}</b><span>上传平台</span></div>
+      <div><small>当前范围</small><b class="platform-name">{{ store.selectedPlatform || '—' }}</b><span>统计范围</span></div>
       <div><small>覆盖题材</small><b>{{ genreCount }}</b><span>种题材类型</span></div>
       <div><small>覆盖月份</small><b>{{ store.timeline.periods.length }}</b><span>个有效月份</span></div>
       <div><small>整体平均热度</small><b>{{ overallHeat.toFixed(1) }}</b><span>按素材数量加权</span></div>
