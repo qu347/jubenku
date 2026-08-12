@@ -5,8 +5,12 @@ chcp 65001 >nul
 set "PROJECT_ROOT=%~dp0"
 set "BACKEND_DIR=%PROJECT_ROOT%backend"
 set "VENV_DIR=%BACKEND_DIR%\.venv"
-set "PYTHON_EXE=%VENV_DIR%\Scripts\python.exe"
-set "ALEMBIC_EXE=%VENV_DIR%\Scripts\alembic.exe"
+set "BUNDLED_PYTHON=%PROJECT_ROOT%python_runtime\python.exe"
+if exist "%BUNDLED_PYTHON%" (
+  set "PYTHON_EXE=%BUNDLED_PYTHON%"
+) else (
+  set "PYTHON_EXE=%VENV_DIR%\Scripts\python.exe"
+)
 set "DATA_ROOT=%PROJECT_ROOT%.runtime\portable"
 set "DB_DIR=%DATA_ROOT%\database"
 set "DB_FILE=%DB_DIR%\script_materials.db"
@@ -116,7 +120,7 @@ set "SETTINGS_ENV_FILE=%DATA_ROOT%\launcher.env"
 pushd "%BACKEND_DIR%" || exit /b 1
 
 echo [准备] 正在检查数据库版本...
-"%ALEMBIC_EXE%" upgrade head
+"%PYTHON_EXE%" -m alembic upgrade head
 if errorlevel 1 (
   echo [错误] 数据库迁移失败。
   popd
