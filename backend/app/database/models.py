@@ -9,6 +9,7 @@ from app.models import (
     Project,
     ProjectMaterial,
     Tag,
+    UploadPlatform,
 )
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     "MaterialVersion",
     "Project",
     "ProjectMaterial",
+    "UploadPlatform",
 ]
