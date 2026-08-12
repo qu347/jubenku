@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import MaterialUploadDrawer from '../components/material/MaterialUploadDrawer.vue'
 import MaterialDetailDrawer from '../components/material/MaterialDetailDrawer.vue'
 import MaterialPreview from '../components/material/MaterialPreview.vue'
+import PlatformHeatInput from '../components/material/PlatformHeatInput.vue'
 import { useMaterialsStore } from '../stores/materials'
 
 const api = vi.hoisted(() => ({ listMaterials: vi.fn(), uploadMaterials: vi.fn(), updateMaterial: vi.fn(), deleteMaterial: vi.fn(), downloadMaterial: vi.fn(), getMaterial: vi.fn() }))
@@ -97,6 +98,7 @@ describe('素材上传抽屉', () => {
     await wrapper.findAll('button').find((button) => button.text() === '现代')!.trigger('click')
 
     expect(wrapper.find('[data-test="add-custom-platform"]').exists()).toBe(true)
+    expect(wrapper.findComponent(PlatformHeatInput).exists()).toBe(true)
     await wrapper.get('[data-test="submit-upload"]').trigger('click')
     expect(wrapper.text()).toContain('请选择或输入上传平台')
     expect(wrapper.text()).toContain('请填写 0 到 100 的平台热度')

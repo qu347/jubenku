@@ -7,6 +7,7 @@ import type { GenreModule } from '../../types/genreModule'
 import type { MaterialUploadFileResult } from '../../types/material'
 import StandardTagSelector from './StandardTagSelector.vue'
 import UploadPlatformSelect from './UploadPlatformSelect.vue'
+import PlatformHeatInput from './PlatformHeatInput.vue'
 import { decodeStandardTags } from '../../utils/materialTaxonomy'
 
 const open = defineModel<boolean>({ required: true })
@@ -134,7 +135,7 @@ async function submit() {
         </div>
         <div v-if="libraryType === 'material'" class="form-grid">
           <el-form-item label="上传平台" required><UploadPlatformSelect v-model="uploadPlatform" select-test-id="upload-platform" /></el-form-item>
-          <el-form-item label="平台热度" required><el-input-number v-model="platformHeat" data-test="platform-heat" :min="0" :max="100" :step="1" class="full" placeholder="0 到 100" /></el-form-item>
+          <el-form-item label="平台热度" required><PlatformHeatInput v-model="platformHeat" test-id="platform-heat" /></el-form-item>
         </div>
         <el-form-item label="标题" :required="singleFile"><el-input v-model="title" data-testid="story-title-input" :disabled="!singleFile" maxlength="100" show-word-limit :placeholder="singleFile ? '输入列表中显示的标题' : '批量上传时自动使用文件名作为标题'" /></el-form-item>
         <el-form-item label="摘要" required><el-input v-model="summary" data-testid="story-summary-input" type="textarea" :rows="3" maxlength="20000" show-word-limit placeholder="用一两句话概括剧情钩子、冲突和看点" /></el-form-item>

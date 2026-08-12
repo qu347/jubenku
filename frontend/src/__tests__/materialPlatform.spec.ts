@@ -9,6 +9,7 @@ import MaterialCardGrid from '../components/material/MaterialCardGrid.vue'
 import MaterialTable from '../components/material/MaterialTable.vue'
 import MaterialFilterBar from '../components/material/MaterialFilterBar.vue'
 import UploadPlatformSelect from '../components/material/UploadPlatformSelect.vue'
+import PlatformHeatInput from '../components/material/PlatformHeatInput.vue'
 import MaterialLibraryView from '../views/materials/MaterialLibraryView.vue'
 
 const http = vi.hoisted(() => ({
@@ -229,6 +230,7 @@ describe('素材平台展示', () => {
       },
     })
     expect(detail.find('[data-test="add-custom-platform"]').exists()).toBe(true)
+    expect(detail.findComponent(PlatformHeatInput).exists()).toBe(true)
     expect(detail.get('[data-test="edit-heat"]').attributes()).toMatchObject({ min: '0', max: '100', step: '1' })
   })
 
