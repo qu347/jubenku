@@ -99,6 +99,20 @@ def test_positioning_excludes_non_active_or_incomplete_materials(
     }]
 
 
+def test_positioning_excludes_inactive_genres(client, create_material, db_session: Session) -> None:
+    active = create_material(platform="番茄小说", heat=70)
+    inactive = create_material(platform="起点中文网", heat=99)
+    inactive.genre_module.status = "inactive"
+    db_session.commit()
+
+    response = client.get("/api/genre-positioning")
+
+    assert response.status_code == 200
+    assert [item["genre_module_id"] for item in response.json()["data"]["items"]] == [
+        active.genre_module.id
+    ]
+
+
 def test_positioning_keeps_genre_platform_pairs_separate_and_uses_latest_spelling(
     client, create_material, db_session: Session
 ) -> None:

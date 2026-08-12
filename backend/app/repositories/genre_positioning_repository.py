@@ -57,7 +57,11 @@ class GenrePositioningRepository:
                 func.max(Material.updated_at).label("latest_updated_at"),
             )
             .join(GenreModule, GenreModule.id == Material.genre_module_id)
-            .where(*material_filters, GenreModule.deleted_at.is_(None))
+            .where(
+                *material_filters,
+                GenreModule.deleted_at.is_(None),
+                GenreModule.status == "active",
+            )
             .group_by(
                 Material.genre_module_id,
                 GenreModule.name,
