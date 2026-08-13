@@ -1,4 +1,5 @@
-from logging.config import fileConfig
+import logging
+import sys
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
@@ -9,8 +10,22 @@ from app.database import models  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+
+
+def configure_migration_logging() -> None:
+    """Configure migration logs without evaluating values from an INI file."""
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("%(levelname)-5.5s [%(name)s] %(message)s", "%H:%M:%S"))
+
+    root_logger = logging.getLogger()
+    root_logger.handlers.clear()
+    root_logger.addHandler(handler)
+    root_logger.setLevel(logging.WARNING)
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+    logging.getLogger("alembic").setLevel(logging.INFO)
+
+
+configure_migration_logging()
 target_metadata = Base.metadata
 
 

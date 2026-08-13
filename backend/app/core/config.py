@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     # CORS_ALLOWED_ORIGINS is the production key. CORS_ORIGINS remains
     # accepted so existing development .env files keep working.
     cors_allowed_origins: str = ""
-    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    cors_origins: str = ""
 
     log_max_bytes: int = Field(default=10 * 1024 * 1024, ge=1024)
     log_backup_count: int = Field(default=10, ge=1)
