@@ -30,6 +30,7 @@ def create_material(db_session: Session):
         genre: GenreModule | None = None,
         platform: str | None = "番茄小说",
         heat: float | None = 80,
+        uploaded_by: str | None = None,
         library_type: str = "material",
         deleted: bool = False,
         created_at: str | None = None,
@@ -46,6 +47,7 @@ def create_material(db_session: Session):
             library_type=library_type,
             upload_platform=platform,
             platform_heat=heat,
+            uploaded_by=uploaded_by,
             deleted_at=datetime.now(timezone.utc) if deleted else None,
         )
         db_session.add(material)
@@ -155,6 +157,30 @@ def test_material_list_filters_upload_platform_case_insensitively(client, create
     create_material(genre=matching.genre_module, platform="起点中文网", heat=80)
 
     response = client.get("/api/materials", params={"upload_platform": "番茄小说"})
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["data"]["items"]] == [matching.id]
+
+
+def test_material_list_filters_uploaded_by_exactly(client, create_material) -> None:
+    matching = create_material(uploaded_by="  董凤  ")
+    create_material(genre=matching.genre_module, uploaded_by="张靖宇")
+
+    response = client.get("/api/materials", params={"uploaded_by": " 董凤 "})
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["data"]["items"]] == [matching.id]
+
+
+def test_material_list_combines_uploader_and_platform_with_and_semantics(client, create_material) -> None:
+    matching = create_material(uploaded_by="董凤", platform="抖音")
+    create_material(genre=matching.genre_module, uploaded_by="董凤", platform="小红书")
+    create_material(genre=matching.genre_module, uploaded_by="张靖宇", platform="抖音")
+
+    response = client.get(
+        "/api/materials",
+        params={"uploaded_by": "董凤", "upload_platform": "抖音"},
+    )
 
     assert response.status_code == 200
     assert [item["id"] for item in response.json()["data"]["items"]] == [matching.id]
