@@ -50,6 +50,7 @@ export interface MaterialFilters {
   source?: string
   upload_platform?: string | null
   platform_heat?: number | null
+  uploaded_by?: string
   uploaded_from?: string
   uploaded_to?: string
   sort?: MaterialSort

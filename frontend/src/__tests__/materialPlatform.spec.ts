@@ -307,4 +307,34 @@ describe('素材平台筛选', () => {
     await flushPromises()
     expect(router.currentRoute.value.query.upload_platform).toBe('自定义平台')
   })
+
+  it('素材库仅显示三个固定上传人并在 URL 中保留 uploaded_by', async () => {
+    const filterOptions = { global: { stubs: {
+      'el-input': true,
+      'el-date-picker': true,
+      'el-option': { props: ['label', 'value'], template: '<option :value="value">{{ label }}</option>' },
+      'el-select': { props: ['modelValue'], template: '<select><slot /></select>' },
+      StandardTagSelector: true,
+      'el-button': { template: '<button><slot /></button>' },
+    } } }
+    const materialFilter = mount(MaterialFilterBar, { props: { modelValue: {}, modules: [] }, ...filterOptions })
+    expect(materialFilter.find('[data-test="filter-uploader"]').exists()).toBe(true)
+    expect(materialFilter.text()).toContain('董凤')
+    expect(materialFilter.text()).toContain('张靖宇')
+    expect(materialFilter.text()).toContain('陈仁杰')
+
+    const scriptFilter = mount(MaterialFilterBar, { props: { modelValue: {}, modules: [], libraryType: 'script' }, ...filterOptions })
+    expect(scriptFilter.find('[data-test="filter-uploader"]').exists()).toBe(false)
+
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/materials', component: MaterialLibraryView }] })
+    await router.push('/materials?uploaded_by=董凤')
+    await router.isReady()
+    const view = shallowMount(MaterialLibraryView, { global: { plugins: [router], stubs: { 'el-select': true, 'el-option': true, 'el-pagination': true } } })
+    await flushPromises()
+    expect(http.request).toHaveBeenCalledWith(expect.objectContaining({ params: expect.objectContaining({ uploaded_by: '董凤' }) }))
+
+    view.findComponent(MaterialFilterBar).vm.$emit('apply', { uploaded_by: '张靖宇', page: 1, page_size: 20, sort: 'created_desc' })
+    await flushPromises()
+    expect(router.currentRoute.value.query.uploaded_by).toBe('张靖宇')
+  })
 })
