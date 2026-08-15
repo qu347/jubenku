@@ -39,6 +39,11 @@ const ElTableColumnStub = defineComponent({
   inject: ['testTableRows'],
   template: '<div v-for="row in testTableRows" :key="row.id"><slot :row="row" /></div>',
 })
+const LabeledElTableColumnStub = defineComponent({
+  props: { label: String },
+  inject: ['testTableRows'],
+  template: '<section><h4>{{ label }}</h4><div v-for="row in testTableRows" :key="row.id"><slot :row="row" /></div></section>',
+})
 
 const editDrawerStubs = {
   MaterialPreview: true,
@@ -284,6 +289,23 @@ describe('素材平台展示', () => {
     })
     expect(table.text()).toContain('番茄小说 · 热度 88')
     expect(table.text()).toContain('平台信息待补充')
+  })
+
+  it('表格将来源列改为上传人并显示上传人姓名', () => {
+    const table = mount(MaterialTable, {
+      props: {
+        items: [
+          { ...material, id: 'named', uploaded_by: '董凤' },
+          { ...material, id: 'missing', uploaded_by: '' },
+        ] as never,
+      },
+      global: { stubs: { 'el-table': ElTableStub, 'el-table-column': LabeledElTableColumnStub, 'el-button': true } },
+    })
+
+    expect(table.text()).toContain('上传人')
+    expect(table.text()).toContain('董凤')
+    expect(table.text()).toContain('未填写')
+    expect(table.text()).not.toContain('来源')
   })
 })
 
