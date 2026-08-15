@@ -24,7 +24,7 @@ function size(value: number) {
     <el-table-column label="文件" width="100"><template #default="scope"><span class="file-pill" :class="{ empty: !scope.row.has_attachment }">{{ scope.row.has_attachment ? scope.row.file_extension.toUpperCase() : '无附件' }}</span></template></el-table-column>
     <el-table-column label="大小" width="95"><template #default="scope">{{ scope.row.has_attachment ? size(scope.row.file_size) : '—' }}</template></el-table-column>
     <el-table-column label="标签" min-width="160"><template #default="scope"><div class="tags"><span v-for="tag in scope.row.tags" :key="tag">{{ tag }}</span><i v-if="!scope.row.tags.length">—</i></div></template></el-table-column>
-    <el-table-column prop="source" label="来源" min-width="120" show-overflow-tooltip />
+    <el-table-column label="上传人" min-width="120" show-overflow-tooltip><template #default="scope">{{ scope.row.uploaded_by || '未填写' }}</template></el-table-column>
     <el-table-column label="上传时间" width="160"><template #default="scope">{{ formatDateTime(scope.row.created_at) }}</template></el-table-column>
     <el-table-column label="操作" width="190" fixed="right">
       <template #default="scope"><el-button text :icon="View" @click="emit('view',scope.row)">查看</el-button><el-button v-if="scope.row.has_attachment" text :icon="Download" aria-label="下载附件" @click="emit('download',scope.row)" /><el-button v-else text :icon="Download" disabled title="该素材没有附件" aria-label="无附件，无法下载" /><el-button text :icon="EditPen" @click="emit('edit',scope.row)" /><el-button text type="danger" :icon="Delete" @click="emit('delete',scope.row)" /></template>
